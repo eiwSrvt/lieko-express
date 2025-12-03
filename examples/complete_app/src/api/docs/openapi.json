@@ -1,0 +1,386 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Lieko-Express Demo API",
+    "version": "1.0.0",
+    "description": "Complete demo API for posts, users, comments with authentication and admin privileges."
+  },
+  "servers": [
+    { "url": "http://localhost:3000" }
+  ],
+  "tags": [
+    { "name": "Users" },
+    { "name": "Posts" },
+    { "name": "Comments" },
+    { "name": "Auth" },
+    { "name": "System" }
+  ],
+  "paths": {
+    "/": {
+      "get": {
+        "summary": "API welcome message",
+        "tags": ["System"],
+        "responses": {
+          "200": { "description": "Welcome message" }
+        }
+      }
+    },
+    "/ping": {
+      "get": {
+        "tags": ["System"],
+        "summary": "Ping",
+        "responses": { "200": { "description": "Pong" } }
+      }
+    },
+    "/health": {
+      "get": {
+        "tags": ["System"],
+        "summary": "Health check",
+        "responses": { "200": { "description": "OK" } }
+      }
+    },
+
+    "/api/protected": {
+      "get": {
+        "summary": "Test protected route",
+        "tags": ["Auth"],
+        "security": [{ "bearerAuth": [] }],
+        "responses": {
+          "200": { "description": "Protected OK" },
+          "401": { "description": "Unauthorized" }
+        }
+      }
+    },
+
+    "/api/admin/users": {
+      "get": {
+        "tags": ["Users"],
+        "summary": "Get all users",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          { "name": "search", "in": "query", "schema": { "type": "string" } },
+          { "name": "sort", "in": "query", "schema": { "type": "string" } },
+          { "name": "active", "in": "query", "schema": { "type": "boolean" } },
+          { "name": "page", "in": "query", "schema": { "type": "integer" } },
+          { "name": "limit", "in": "query", "schema": { "type": "integer" } }
+        ],
+        "responses": {
+          "200": { "description": "List of users" },
+          "401": { "description": "Unauthorized" }
+        }
+      },
+      "post": {
+        "tags": ["Users"],
+        "summary": "Create user",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": { "schema": { "$ref": "#/components/schemas/UserInput" } }
+          }
+        },
+        "responses": {
+          "201": { "description": "User created" },
+          "400": { "description": "Validation error" }
+        }
+      }
+    },
+
+    "/api/admin/users/{id}": {
+      "get": {
+        "tags": ["Users"],
+        "summary": "Get user by ID",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "integer" } }
+        ],
+        "responses": {
+          "200": { "description": "User found" },
+          "404": { "description": "Not found" }
+        }
+      },
+      "patch": {
+        "tags": ["Users"],
+        "summary": "Update user",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "integer" } }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/UserUpdate" } } }
+        },
+        "responses": {
+          "200": { "description": "User updated" },
+          "404": { "description": "Not found" }
+        }
+      },
+      "delete": {
+        "tags": ["Users"],
+        "summary": "Delete user",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "integer" } }
+        ],
+        "responses": {
+          "200": { "description": "User deleted" },
+          "404": { "description": "Not found" }
+        }
+      }
+    },
+
+    "/api/admin/posts": {
+      "get": {
+        "tags": ["Posts"],
+        "summary": "Get posts",
+        "parameters": [
+          { "name": "search", "in": "query", "schema": { "type": "string" } },
+          { "name": "published", "in": "query", "schema": { "type": "boolean" } },
+          { "name": "sort", "in": "query", "schema": { "type": "string" } },
+          { "name": "page", "in": "query", "schema": { "type": "integer" } },
+          { "name": "limit", "in": "query", "schema": { "type": "integer" } }
+        ],
+        "responses": {
+          "200": { "description": "List of posts" }
+        }
+      },
+      "post": {
+        "tags": ["Posts"],
+        "summary": "Create post",
+        "security": [{ "bearerAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": { "schema": { "$ref": "#/components/schemas/PostInput" } }
+          }
+        },
+        "responses": {
+          "201": { "description": "Post created" }
+        }
+      }
+    },
+
+    "/api/admin/posts/{id}": {
+      "get": {
+        "tags": ["Posts"],
+        "summary": "Get post by ID (with comments)",
+        "parameters": [
+          { "name": "id", "in": "path", "schema": { "type": "integer" }, "required": true }
+        ],
+        "responses": { "200": { "description": "Post found" }, "404": { "description": "Not found" } }
+      },
+      "patch": {
+        "tags": ["Posts"],
+        "summary": "Update post",
+        "security": [{ "bearerAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": { "schema": { "$ref": "#/components/schemas/PostUpdate" } }
+          }
+        },
+        "responses": {
+          "200": { "description": "Post updated" },
+          "404": { "description": "Not found" }
+        }
+      },
+      "delete": {
+        "tags": ["Posts"],
+        "summary": "Delete post",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          { "name": "id", "in": "path", "schema": { "type": "integer" }, "required": true }
+        ],
+        "responses": {
+          "200": { "description": "Post deleted" },
+          "404": { "description": "Not found" }
+        }
+      }
+    },
+
+    "/api/admin/posts/{id}/publish": {
+      "patch": {
+        "tags": ["Posts"],
+        "summary": "Publish a post",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          { "name": "id", "in": "path", "schema": { "type": "integer" }, "required": true }
+        ],
+        "responses": {
+          "200": { "description": "Post published" },
+          "403": { "description": "Requires admin" }
+        }
+      }
+    },
+
+    "/api/admin/comments": {
+      "get": {
+        "tags": ["Comments"],
+        "summary": "List comments",
+        "parameters": [
+          { "name": "postId", "in": "query", "schema": { "type": "integer" } },
+          { "name": "search", "in": "query", "schema": { "type": "string" } },
+          { "name": "approved", "in": "query", "schema": { "type": "boolean" } },
+          { "name": "page", "in": "query", "schema": { "type": "integer" } },
+          { "name": "limit", "in": "query", "schema": { "type": "integer" } }
+        ],
+        "responses": { "200": { "description": "Comments list" } }
+      },
+      "post": {
+        "tags": ["Comments"],
+        "summary": "Create comment",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": { "schema": { "$ref": "#/components/schemas/CommentInput" } }
+          }
+        },
+        "responses": { "201": { "description": "Comment created" } }
+      }
+    },
+
+    "/api/admin/comments/{id}": {
+      "get": {
+        "tags": ["Comments"],
+        "summary": "Get comment",
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "integer" } }
+        ],
+        "responses": { "200": { "description": "Found" }, "404": { "description": "Not found" } }
+      },
+      "patch": {
+        "tags": ["Comments"],
+        "summary": "Update comment",
+        "security": [{ "bearerAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": { "schema": { "$ref": "#/components/schemas/CommentUpdate" } }
+          }
+        },
+        "responses": { "200": { "description": "Updated" }, "404": { "description": "Not found" } }
+      },
+      "delete": {
+        "tags": ["Comments"],
+        "summary": "Delete comment",
+        "security": [{ "bearerAuth": [] }],
+        "responses": {
+          "200": { "description": "Deleted" },
+          "404": { "description": "Not found" }
+        }
+      }
+    },
+
+    "/api/admin/comments/{id}/approve": {
+      "patch": {
+        "tags": ["Comments"],
+        "summary": "Approve a comment",
+        "security": [{ "bearerAuth": [] }],
+        "responses": {
+          "200": { "description": "Approved" },
+          "403": { "description": "Admin only" }
+        }
+      }
+    }
+  },
+
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer"
+      }
+    },
+    "schemas": {
+      "User": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "integer" },
+          "username": { "type": "string" },
+          "email": { "type": "string" },
+          "age": { "type": "integer" },
+          "active": { "type": "boolean" }
+        }
+      },
+      "UserInput": {
+        "type": "object",
+        "required": ["username", "email", "age"],
+        "properties": {
+          "username": { "type": "string" },
+          "email": { "type": "string" },
+          "age": { "type": "integer" },
+          "active": { "type": "boolean" }
+        }
+      },
+      "UserUpdate": {
+        "type": "object",
+        "properties": {
+          "username": { "type": "string" },
+          "email": { "type": "string" },
+          "age": { "type": "integer" },
+          "active": { "type": "boolean" }
+        }
+      },
+
+      "Post": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "integer" },
+          "title": { "type": "string" },
+          "content": { "type": "string" },
+          "published": { "type": "boolean" },
+          "userId": { "type": "integer" }
+        }
+      },
+      "PostInput": {
+        "type": "object",
+        "required": ["title", "content"],
+        "properties": {
+          "title": { "type": "string" },
+          "content": { "type": "string" },
+          "published": { "type": "boolean" }
+        }
+      },
+      "PostUpdate": {
+        "type": "object",
+        "properties": {
+          "title": { "type": "string" },
+          "content": { "type": "string" },
+          "published": { "type": "boolean" }
+        }
+      },
+
+      "Comment": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "integer" },
+          "postId": { "type": "integer" },
+          "text": { "type": "string" },
+          "approved": { "type": "boolean" }
+        }
+      },
+      "CommentInput": {
+        "type": "object",
+        "required": ["text", "postId"],
+        "properties": {
+          "postId": { "type": "integer" },
+          "text": { "type": "string" }
+        }
+      },
+      "CommentUpdate": {
+        "type": "object",
+        "properties": {
+          "text": { "type": "string" }
+        }
+      },
+
+      "AuthResponse": {
+        "type": "object",
+        "properties": {
+          "success": { "type": "boolean" },
+          "token": { "type": "string" },
+          "user": { "$ref": "#/components/schemas/User" }
+        }
+      }
+    }
+  }
+}

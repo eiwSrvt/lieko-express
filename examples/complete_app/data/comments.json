@@ -1,0 +1,454 @@
+[
+  {
+    "id": 1,
+    "postId": 1,
+    "userId": 2,
+    "text": "Great first post!",
+    "approved": true
+  },
+  {
+    "id": 2,
+    "postId": 1,
+    "userId": 3,
+    "text": "Welcome to the community!",
+    "approved": true
+  },
+  {
+    "id": 3,
+    "postId": 1,
+    "userId": 4,
+    "text": "Classic Hello World",
+    "approved": true
+  },
+  {
+    "id": 4,
+    "postId": 3,
+    "userId": 2,
+    "text": "Totally agree! Zero deps is the way!",
+    "approved": true
+  },
+  {
+    "id": 5,
+    "postId": 3,
+    "userId": 3,
+    "text": "This is why I left Express",
+    "approved": true
+  },
+  {
+    "id": 6,
+    "postId": 3,
+    "userId": 5,
+    "text": "Mind blown",
+    "approved": true
+  },
+  {
+    "id": 7,
+    "postId": 4,
+    "userId": 1,
+    "text": "Thanks Jane! Great comparison",
+    "approved": true
+  },
+  {
+    "id": 8,
+    "postId": 4,
+    "userId": 3,
+    "text": "The benchmarks speak for themselves",
+    "approved": false
+  },
+  {
+    "id": 9,
+    "postId": 5,
+    "userId": 2,
+    "text": "2025 is the year of minimalism",
+    "approved": true
+  },
+  {
+    "id": 10,
+    "postId": 5,
+    "userId": 4,
+    "text": "So true",
+    "approved": true
+  },
+  {
+    "id": 11,
+    "postId": 8,
+    "userId": 1,
+    "text": "This helped me a lot, thanks!",
+    "approved": false
+  },
+  {
+    "id": 12,
+    "postId": 8,
+    "userId": 3,
+    "text": "Perfect explanation",
+    "approved": true
+  },
+  {
+    "id": 13,
+    "postId": 10,
+    "userId": 2,
+    "text": "This should be in the docs!",
+    "approved": true
+  },
+  {
+    "id": 14,
+    "postId": 12,
+    "userId": 4,
+    "text": "Never knew multipart was so easy",
+    "approved": true
+  },
+  {
+    "id": 15,
+    "postId": 15,
+    "userId": 1,
+    "text": "Testing is so smooth with Lieko",
+    "approved": false
+  },
+  {
+    "id": 16,
+    "postId": 16,
+    "userId": 2,
+    "text": "res.paginated() is a game changer",
+    "approved": true
+  },
+  {
+    "id": 17,
+    "postId": 19,
+    "userId": 3,
+    "text": "Can't wait to see the results!",
+    "approved": false
+  },
+  {
+    "id": 18,
+    "postId": 19,
+    "userId": 1,
+    "text": "Spoiler: Lieko wins",
+    "approved": false
+  },
+  {
+    "id": 19,
+    "postId": 25,
+    "userId": 4,
+    "text": "This saved my API from bots",
+    "approved": true
+  },
+  {
+    "id": 20,
+    "postId": 30,
+    "userId": 2,
+    "text": "Metrics are crucial!",
+    "approved": false
+  },
+  {
+    "id": 21,
+    "postId": 1,
+    "userId": 1,
+    "text": "Thanks everyone!",
+    "approved": false
+  },
+  {
+    "id": 22,
+    "postId": 3,
+    "userId": 4,
+    "text": "Best decision ever",
+    "approved": true
+  },
+  {
+    "id": 23,
+    "postId": 10,
+    "userId": 5,
+    "text": "Simple and effective",
+    "approved": true
+  },
+  {
+    "id": 24,
+    "postId": 16,
+    "userId": 3,
+    "text": "I use this every day",
+    "approved": true
+  },
+  {
+    "id": 25,
+    "postId": 50,
+    "userId": 2,
+    "text": "Congrats on 50 posts!",
+    "approved": false
+  },
+  {
+    "id": 26,
+    "postId": 48,
+    "userId": 1,
+    "text": "This would be amazing",
+    "approved": false
+  },
+  {
+    "id": 27,
+    "postId": 40,
+    "userId": 4,
+    "text": "WebSockets please!",
+    "approved": false
+  },
+  {
+    "id": 28,
+    "postId": 33,
+    "userId": 3,
+    "text": "Security first!",
+    "approved": true
+  },
+  {
+    "id": 29,
+    "postId": 25,
+    "userId": 1,
+    "text": "Works perfectly",
+    "approved": true
+  },
+  {
+    "id": 30,
+    "postId": 19,
+    "userId": 5,
+    "text": "Lieko is the future",
+    "approved": true
+  },
+  {
+    "id": 31,
+    "postId": 8,
+    "userId": 2,
+    "text": "Clean and clear",
+    "approved": true
+  },
+  {
+    "id": 32,
+    "postId": 12,
+    "userId": 3,
+    "text": "No more multer!",
+    "approved": true
+  },
+  {
+    "id": 33,
+    "postId": 15,
+    "userId": 4,
+    "text": "Testing made easy",
+    "approved": true
+  },
+  {
+    "id": 34,
+    "postId": 16,
+    "userId": 1,
+    "text": "Love this helper",
+    "approved": true
+  },
+  {
+    "id": 35,
+    "postId": 50,
+    "userId": 3,
+    "text": "Here's to 100 more!",
+    "approved": true
+  },
+  {
+    "id": 36,
+    "postId": 1,
+    "userId": 5,
+    "text": "Still relevant in 2025",
+    "approved": true
+  },
+  {
+    "id": 37,
+    "postId": 3,
+    "userId": 1,
+    "text": "Zero deps forever",
+    "approved": true
+  },
+  {
+    "id": 38,
+    "postId": 10,
+    "userId": 2,
+    "text": "Essential for any API",
+    "approved": false
+  },
+  {
+    "id": 39,
+    "postId": 48,
+    "userId": 4,
+    "text": "Auto docs would be killer",
+    "approved": false
+  },
+  {
+    "id": 40,
+    "postId": 40,
+    "userId": 5,
+    "text": "Can't wait for plugins",
+    "approved": true
+  },
+  {
+    "id": 41,
+    "postId": 25,
+    "userId": 3,
+    "text": "Rate limiting done right",
+    "approved": false
+  },
+  {
+    "id": 42,
+    "postId": 33,
+    "userId": 2,
+    "text": "Don't forget helmet!",
+    "approved": false
+  },
+  {
+    "id": 43,
+    "postId": 19,
+    "userId": 1,
+    "text": "Fastest framework ever",
+    "approved": true
+  },
+  {
+    "id": 44,
+    "postId": 50,
+    "userId": 4,
+    "text": "Proud to be part of this",
+    "approved": true
+  },
+  {
+    "id": 45,
+    "postId": 16,
+    "userId": 5,
+    "text": "Pagination never been easier",
+    "approved": true
+  },
+  {
+    "id": 46,
+    "postId": 8,
+    "userId": 3,
+    "text": "This should be default",
+    "approved": true
+  },
+  {
+    "id": 47,
+    "postId": 12,
+    "userId": 1,
+    "text": "File upload in 10 lines",
+    "approved": true
+  },
+  {
+    "id": 48,
+    "postId": 15,
+    "userId": 2,
+    "text": "Testing is a breeze",
+    "approved": true
+  },
+  {
+    "id": 49,
+    "postId": 40,
+    "userId": 4,
+    "text": "CLI would be awesome",
+    "approved": true
+  },
+  {
+    "id": 50,
+    "postId": 50,
+    "userId": 5,
+    "text": "Thank YOU for Lieko!",
+    "approved": true
+  },
+  {
+    "id": 51,
+    "postId": 1,
+    "userId": 1,
+    "text": "Still my favorite post",
+    "approved": true
+  },
+  {
+    "id": 52,
+    "postId": 3,
+    "userId": 2,
+    "text": "Zero deps = zero problems",
+    "approved": true
+  },
+  {
+    "id": 53,
+    "postId": 10,
+    "userId": 3,
+    "text": "Security first",
+    "approved": true
+  },
+  {
+    "id": 54,
+    "postId": 16,
+    "userId": 4,
+    "text": "Best feature ever",
+    "approved": true
+  },
+  {
+    "id": 55,
+    "postId": 50,
+    "userId": 1,
+    "text": "To the moon!",
+    "approved": true
+  },
+  {
+    "id": 56,
+    "postId": 19,
+    "userId": 5,
+    "text": "Lieko dominates",
+    "approved": true
+  },
+  {
+    "id": 57,
+    "postId": 25,
+    "userId": 2,
+    "text": "No more DDoS",
+    "approved": true
+  },
+  {
+    "id": 58,
+    "postId": 33,
+    "userId": 3,
+    "text": "Headers matter",
+    "approved": true
+  },
+  {
+    "id": 59,
+    "postId": 40,
+    "userId": 4,
+    "text": "Future looks bright",
+    "approved": true
+  },
+  {
+    "id": 60,
+    "postId": 50,
+    "userId": 5,
+    "text": "Best community ever!",
+    "approved": true
+  },
+  {
+    "id": 61,
+    "postId": 2,
+    "userId": 1,
+    "text": "test",
+    "approved": false,
+    "createdAt": "2025-12-03T17:01:45.997Z"
+  },
+  {
+    "id": 62,
+    "postId": 50,
+    "userId": 1,
+    "text": "new comment",
+    "approved": false,
+    "createdAt": "2025-12-03T17:03:06.765Z"
+  },
+  {
+    "id": 63,
+    "postId": 39,
+    "userId": 1,
+    "text": "test",
+    "approved": false,
+    "createdAt": "2025-12-03T17:07:01.173Z"
+  },
+  {
+    "id": 64,
+    "postId": 7,
+    "userId": 1,
+    "text": "test",
+    "approved": false,
+    "createdAt": "2025-12-03T18:56:11.511Z"
+  }
+]

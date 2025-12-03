@@ -1,0 +1,17 @@
+{
+  "name": "lieko-express",
+  "version": "0.0.2",
+  "description": "Lieko-express — A Modern, Minimal, REST API Framework for Node.js",
+  "main": "lieko-express.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "EiwSrvt eiwsrvt@gmail.com",
+  "license": "ISC",
+  "type": "commonjs",
+  "files": [
+    "lieko-express.js",
+    "README.md"
+  ]
+}

@@ -1,0 +1,935 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Lieko Admin Demo — Clean Dashboard</title>
+
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <style>
+        body {
+            font-family: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
+            background: #f3f4f6;
+        }
+
+        .tab {
+            cursor: pointer
+        }
+
+        .modal-backdrop {
+            background: rgba(15, 23, 42, 0.6);
+        }
+
+        .line-clamp-3 {
+            display: -webkit-box;
+            -webkit-line-clamp: 3;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+        }
+
+        .toast {
+            transition: all .25s ease;
+        }
+    </style>
+</head>
+
+<body class="min-h-screen">
+
+    <div class="max-w-7xl mx-auto p-8">
+        <header class="flex items-center justify-between mb-8">
+            <div>
+                <h1 class="text-3xl font-bold">Lieko Admin Demo</h1>
+                <p class="text-gray-600 mt-1">Posts · Users · Comments · clean demo for Lieko-Express</p>
+            </div>
+
+            <div class="flex gap-3 items-center">
+                <button id="btn-open-create" class="px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700">+
+                    New
+                </button>
+            </div>
+        </header>
+
+        <!-- Tabs -->
+        <nav class="mb-6 flex gap-2">
+            <div class="tab active px-4 py-2 rounded-t-lg bg-white border-b-4 border-indigo-600" data-tab="overview">
+                Overview</div>
+            <div class="tab px-4 py-2 rounded-t-lg bg-gray-100" data-tab="posts">Posts</div>
+            <div class="tab px-4 py-2 rounded-t-lg bg-gray-100" data-tab="users">Users</div>
+            <div class="tab px-4 py-2 rounded-t-lg bg-gray-100" data-tab="comments">Comments</div>
+        </nav>
+
+        <!-- Overview -->
+        <section id="overview" class="tab-content bg-white p-6 rounded shadow">
+            <div class="grid grid-cols-3 gap-4">
+                <div class="p-4 border rounded">
+                    <div class="text-sm text-gray-500">Total Posts</div>
+                    <div id="stat-posts" class="text-2xl font-bold mt-2">—</div>
+                </div>
+                <div class="p-4 border rounded">
+                    <div class="text-sm text-gray-500">Total Users</div>
+                    <div id="stat-users" class="text-2xl font-bold mt-2">—</div>
+                </div>
+                <div class="p-4 border rounded">
+                    <div class="text-sm text-gray-500">Pending Comments</div>
+                    <div id="stat-pending" class="text-2xl font-bold mt-2">—</div>
+                </div>
+            </div>
+
+            <div class="mt-6 grid grid-cols-2 gap-4">
+                <div class="p-4 border rounded">
+                    <h3 class="font-bold text-lg mb-2">Quick Actions</h3>
+                    <div class="flex gap-2">
+                        <button class="px-3 py-2 bg-green-600 text-white rounded" id="action-create-post">Create
+                            Post</button>
+                        <button class="px-3 py-2 bg-blue-600 text-white rounded" id="action-create-user">Create
+                            User</button>
+                        <button class="px-3 py-2 bg-yellow-600 text-white rounded" id="action-create-comment">Create
+                            Comment</button>
+                    </div>
+                    <p class="text-xs text-gray-500 mt-3">Demo admin token: <code>Bearer 1234</code></p>
+                </div>
+
+                <div class="p-4 border rounded">
+                    <h3 class="font-bold text-lg mb-2">Recent Activity</h3>
+                    <ul id="recent-activity" class="text-sm text-gray-700 space-y-2 max-h-48 overflow-auto"></ul>
+                </div>
+            </div>
+        </section>
+
+        <!-- Posts -->
+        <section id="posts" class="tab-content hidden bg-white p-6 rounded shadow">
+            <div class="flex justify-between items-center mb-4">
+                <div class="flex gap-3">
+                    <input id="posts-search" class="px-3 py-2 border rounded w-96"
+                        placeholder="Search posts by title or content..." />
+                    <select id="posts-sort" class="px-3 py-2 border rounded">
+                        <option value="createdAt:desc">Newest</option>
+                        <option value="createdAt:asc">Oldest</option>
+                        <option value="title:asc">Title A→Z</option>
+                    </select>
+                    <label class="flex items-center text-sm text-gray-600 gap-2"><input id="posts-filter-published"
+                            type="checkbox" /> Only published</label>
+                </div>
+
+                <div class="flex gap-2">
+                    <button class="px-3 py-2 bg-indigo-600 text-white rounded" id="btn-refresh-posts">Refresh</button>
+                </div>
+            </div>
+
+            <div id="posts-list" class="grid md:grid-cols-2 lg:grid-cols-3 gap-4"></div>
+
+            <div class="mt-4 flex items-center justify-between">
+                <div>
+                    <button id="posts-prev" class="px-3 py-1 bg-gray-200 rounded disabled:opacity-50"
+                        disabled>Previous</button>
+                    <button id="posts-next" class="px-3 py-1 bg-gray-200 rounded disabled:opacity-50"
+                        disabled>Next</button>
+                </div>
+                <div id="posts-page-info" class="text-sm text-gray-600"></div>
+            </div>
+        </section>
+
+        <!-- Users -->
+        <section id="users" class="tab-content hidden bg-white p-6 rounded shadow">
+            <div class="flex justify-between items-center mb-4">
+                <div class="flex gap-3">
+                    <input id="users-search" class="px-3 py-2 border rounded w-80" placeholder="Search users..." />
+                    <select id="users-sort" class="px-3 py-2 border rounded">
+                        <option value="id:asc">ID</option>
+                        <option value="username:asc">Username A→Z</option>
+                        <option value="age:desc">Age desc</option>
+                    </select>
+                </div>
+                <div><button id="btn-refresh-users" class="px-3 py-2 bg-indigo-600 text-white rounded">Refresh</button>
+                </div>
+            </div>
+
+            <div id="users-list" class="grid md:grid-cols-3 lg:grid-cols-4 gap-4"></div>
+
+            <div class="mt-4 text-right text-sm text-gray-600">Tip: Click a user card to edit / delete</div>
+        </section>
+
+        <!-- Comments -->
+        <section id="comments" class="tab-content hidden bg-white p-6 rounded shadow">
+            <div class="flex justify-between items-center mb-4">
+                <div class="flex gap-3">
+                    <input id="comments-search" class="px-3 py-2 border rounded w-80"
+                        placeholder="Search comments..." />
+                    <select id="comments-filter" class="px-3 py-2 border rounded">
+                        <option value="">All</option>
+                        <option value="approved">Approved</option>
+                        <option value="pending">Pending</option>
+                    </select>
+                </div>
+                <div><button id="btn-refresh-comments"
+                        class="px-3 py-2 bg-indigo-600 text-white rounded">Refresh</button></div>
+            </div>
+
+            <div id="comments-list" class="space-y-3"></div>
+
+            <div class="mt-4 flex justify-between">
+                <div>
+                    <button id="comments-prev" class="px-3 py-1 bg-gray-200 rounded disabled:opacity-50"
+                        disabled>Previous</button>
+                    <button id="comments-next" class="px-3 py-1 bg-gray-200 rounded disabled:opacity-50"
+                        disabled>Next</button>
+                </div>
+                <div id="comments-page-info" class="text-sm text-gray-600"></div>
+            </div>
+        </section>
+    </div>
+
+    <!-- Modals / Forms -->
+    <div id="modal-backdrop" class="fixed inset-0 hidden items-center justify-center modal-backdrop">
+        <div id="modal" class="bg-white w-11/12 md:w-2/3 lg:w-1/2 rounded shadow-lg p-6">
+            <div class="flex justify-between items-center">
+                <h3 id="modal-title" class="text-xl font-bold">Modal</h3>
+                <button id="modal-close" class="text-gray-500 hover:text-gray-800">&times;</button>
+            </div>
+            <div id="modal-body" class="mt-4"></div>
+        </div>
+    </div>
+
+    <!-- Toast -->
+    <div id="toast" class="fixed right-6 bottom-6 hidden toast p-4 bg-black text-white rounded shadow-lg"></div>
+
+    <script>
+        const BASE_URL = 'http://127.0.0.1:3000';
+        const API = BASE_URL + '/api/admin';
+        const ADMIN_TOKEN = 'Bearer 1234'; // demo admin token
+
+        async function checkApi() {
+            try {
+                const res = await fetch(`${BASE_URL}/ping`);
+                if (!res.ok) throw new Error();
+
+                document.body.classList.remove("api-down");
+                return true;
+
+            } catch (err) {
+                showToast("Please start REST APP", "error");
+
+                const overlay = document.createElement("div");
+                overlay.id = "api-down-overlay";
+                overlay.className = "fixed inset-0 bg-white bg-opacity-90 flex items-center justify-center text-2xl text-red-700 font-bold z-50";
+                overlay.textContent = "⚠ REST API Offline — Please start REST APP";
+
+                document.body.appendChild(overlay);
+
+                return false;
+            }
+        }
+
+        function showToast(msg, type = 'info') {
+            const t = document.getElementById('toast');
+            t.textContent = msg;
+            t.className = 'fixed right-6 bottom-6 toast p-4 rounded shadow-lg';
+            t.style.background = type === 'error' ? '#b91c1c' : type === 'success' ? '#065f46' : '#111827';
+            t.style.color = '#fff';
+            t.style.display = 'block';
+            setTimeout(() => t.style.display = 'none', 3500);
+        }
+
+        function el(html) { const wrapper = document.createElement('div'); wrapper.innerHTML = html.trim(); return wrapper.firstElementChild; }
+
+        function pushActivity(text) {
+            const ul = document.getElementById('recent-activity');
+            const li = document.createElement('li');
+            li.textContent = `${new Date().toLocaleTimeString()} — ${text}`;
+            ul.prepend(li);
+            while (ul.children.length > 12) ul.removeChild(ul.lastChild);
+        }
+
+        function openModal(title, contentHtml) {
+            document.getElementById('modal-title').textContent = title;
+            contentHtml = contentHtml.trim();
+
+            const body = document.getElementById('modal-body');
+            body.innerHTML = '';
+            body.appendChild(el(contentHtml));
+
+            const backdrop = document.getElementById('modal-backdrop');
+            backdrop.classList.remove('hidden');
+            backdrop.classList.add('flex');
+        }
+
+        function closeModal() {
+            const b = document.getElementById('modal-backdrop');
+            b.classList.add('hidden');
+            b.classList.remove('flex');
+
+            document.getElementById('modal-body').innerHTML = '';
+            document.getElementById('modal-title').textContent = '';
+        }
+        document.getElementById('modal-close').addEventListener('click', closeModal);
+
+        /* Tabs */
+        document.querySelectorAll('.tab').forEach(t => t.addEventListener('click', e => {
+            document.querySelectorAll('.tab').forEach(x => x.classList.remove('active', 'bg-white', 'border-b-4', 'border-b-indigo-600'));
+            document.querySelectorAll('.tab').forEach(x => x.classList.add('bg-gray-100'));
+            t.classList.add('active', 'bg-white', 'border-b-4', 'border-indigo-600');
+            const tab = t.dataset.tab;
+            document.querySelectorAll('.tab-content').forEach(s => s.classList.add('hidden'));
+            document.getElementById(tab).classList.remove('hidden');
+
+            if (tab === 'posts') loadPosts();
+            if (tab === 'users') loadUsers();
+            if (tab === 'comments') loadComments();
+        }));
+
+        document.getElementById('btn-open-create').addEventListener('click', () => openCreateMenu());
+        document.getElementById('action-create-post').addEventListener('click', () => openPostCreate());
+        document.getElementById('action-create-user').addEventListener('click', () => openUserCreate());
+        document.getElementById('action-create-comment').addEventListener('click', () => openCommentCreate());
+
+        async function fetchJson(url, options = {}) {
+            const res = await fetch(url, options);
+            const json = await res.json().catch(() => ({}));
+
+            return {
+                status: res.status,
+                data: json.data,
+                error: json.error,
+                message: json.message,
+                raw: json
+            };
+        }
+
+        function adminHeaders(extra = {}) {
+            return { 'Content-Type': 'application/json', 'Authorization': ADMIN_TOKEN, ...extra };
+        }
+
+        let postsPage = 1;
+
+        document.getElementById('btn-refresh-posts').addEventListener('click', () => loadPosts());
+        document.getElementById('posts-search').addEventListener('keypress', e => { if (e.key === 'Enter') loadPosts(1); });
+        document.getElementById('posts-prev').addEventListener('click', () => loadPosts(postsPage - 1));
+        document.getElementById('posts-next').addEventListener('click', () => loadPosts(postsPage + 1));
+
+        async function loadPosts(page = 1) {
+            postsPage = page;
+
+            const q = document.getElementById('posts-search').value.trim();
+            const sort = document.getElementById('posts-sort').value;
+            const onlyPublished = document.getElementById('posts-filter-published').checked;
+
+            const params = new URLSearchParams({ page, limit: 9 });
+            if (q) params.set('search', q);
+            if (sort) params.set('sort', sort);
+            if (onlyPublished) params.set('published', 'true');
+
+            const { data, raw, status } = await fetchJson(`${API}/posts?${params}`, { headers: adminHeaders() });
+
+            if (status !== 200) {
+                showToast(raw?.error?.message || "Failed to load posts", "error");
+                return;
+            }
+
+            const posts = data || [];
+            const pag = raw?.pagination || {
+                page: 1,
+                totalPages: 1,
+                total: 0,
+                hasPrev: false,
+                hasNext: false
+            };
+
+            const list = document.getElementById('posts-list');
+            list.innerHTML = posts.map(p => `
+        <div class="p-4 border rounded hover:shadow cursor-pointer bg-white" onclick="openPostView(${p.id})">
+            <div class="flex justify-between">
+                <h3 class="font-bold text-indigo-700">${escapeHtml(p.title)}</h3>
+                <div class="text-xs text-gray-500">
+                    ${new Date(p.createdAt || Date.now()).toLocaleDateString()}
+                </div>
+            </div>
+
+            <p class="text-sm text-gray-700 mt-2 line-clamp-3">${escapeHtml(p.content)}</p>
+
+            <div class="mt-3 flex items-center justify-between">
+                <div class="text-xs text-gray-500">
+                    By User ${p.userId} • ${p.published
+                    ? '<span class="text-green-600 font-semibold">Published</span>'
+                    : '<span class="text-yellow-600 font-semibold">Draft</span>'
+                }
+                </div>
+                <div class="flex gap-2">
+                    ${!p.published
+                    ? `<button class="px-2 py-1 bg-green-600 text-white text-xs rounded"
+                                   onclick="publishPost(${p.id})">Publish</button>`
+                    : ''
+                }
+                    <button class="px-2 py-1 bg-gray-200 text-gray-800 text-xs rounded"
+                            onclick="openPostEdit(${p.id})">Edit</button>
+                </div>
+            </div>
+        </div>
+    `).join('');
+
+            document.getElementById('posts-page-info').textContent =
+                `Page ${pag.page} / ${pag.totalPages} — ${pag.total} posts`;
+
+            document.getElementById('posts-prev').disabled = !pag.hasPrev;
+            document.getElementById('posts-next').disabled = !pag.hasNext;
+
+            pushActivity('Loaded posts page ' + pag.page);
+        }
+
+        async function publishPost(id) {
+            try {
+                const { status } = await fetchJson(`${API}/posts/${id}/publish`, { method: 'PATCH', headers: adminHeaders() });
+                if (status === 200) {
+                    showToast('Post published', 'success');
+                    loadPosts();
+                    pushActivity('Published post #' + id);
+                } else {
+                    showToast('Publish failed', 'error');
+                }
+            } catch (err) {
+                showToast('Network error', 'error');
+            }
+        }
+
+        async function openPostEdit(postId) {
+            const { data: post, raw, status } = await fetchJson(`${API}/posts/${postId}`, { headers: adminHeaders() });
+
+            if (status !== 200) {
+                showToast(raw?.error?.message || "Failed to load post", "error");
+                return;
+            }
+
+            openModal('Edit Post', `
+        <div class="space-y-3">
+            <label class="text-sm">Title</label>
+            <input id="edit-post-title" class="w-full px-3 py-2 border rounded"
+                   value="${escapeHtml(post.title || '')}" />
+
+            <label class="text-sm">Content</label>
+            <textarea id="edit-post-content" class="w-full px-3 py-2 border rounded" rows="6">
+${escapeHtml(post.content || '')}
+            </textarea>
+
+            <label class="inline-flex items-center gap-2">
+                <input id="edit-post-published" type="checkbox"
+                       ${post.published ? 'checked' : ''} /> Published
+            </label>
+
+            <div class="flex gap-2">
+                <button id="save-post-btn" class="px-3 py-2 bg-green-600 text-white rounded">Save</button>
+                <button class="px-3 py-2 bg-gray-200 rounded" onclick="closeModal()">Cancel</button>
+            </div>
+        </div>
+    `);
+
+            document.getElementById('save-post-btn').addEventListener('click', async () => {
+                const payload = {
+                    title: document.getElementById('edit-post-title').value.trim(),
+                    content: document.getElementById('edit-post-content').value.trim(),
+                    published: document.getElementById('edit-post-published').checked
+                };
+
+                const { status } = await fetchJson(`${API}/posts/${postId}`, {
+                    method: 'PATCH',
+                    headers: adminHeaders(),
+                    body: JSON.stringify(payload)
+                });
+
+                if (status === 200) {
+                    showToast('Post updated', 'success');
+                    closeModal();
+                    loadPosts();
+                    pushActivity('Updated post #' + postId);
+                } else {
+                    showToast('Update failed', 'error');
+                }
+            });
+        }
+
+        document.getElementById('btn-refresh-users').addEventListener('click', () => loadUsers());
+        document.getElementById('users-search').addEventListener('keypress', e => { if (e.key === 'Enter') loadUsers(); });
+
+        async function loadUsers() {
+            const q = document.getElementById('users-search').value.trim();
+            const sort = document.getElementById('users-sort').value;
+
+            const params = new URLSearchParams({ page: 1, limit: 100 });
+            if (q) params.set('search', q);
+            if (sort) params.set('sort', sort);
+
+            const { data, raw, status } = await fetchJson(
+                `${API}/users?${params}`,
+                { headers: adminHeaders() }
+            );
+
+            if (status !== 200) {
+                showToast(raw?.error?.message || 'Failed to load users', 'error');
+                return;
+            }
+
+            const users = data || [];
+
+            const list = document.getElementById('users-list');
+            list.innerHTML = users.map(u => `
+        <div class="p-4 border rounded bg-white hover:shadow cursor-pointer" onclick='openUserEdit(${u.id})'>
+            <div class="flex items-center gap-3">
+                <div class="w-12 h-12 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-full flex items-center justify-center text-white font-bold">
+                    ${escapeHtml((u.username || u.name || '?')[0])}
+                </div>
+                <div>
+                    <div class="font-semibold">${escapeHtml(u.username || u.name || '')}</div>
+                    <div class="text-sm text-gray-500">${escapeHtml(u.email || '')}</div>
+                    <div class="text-xs mt-1 ${u.active ? "text-green-600" : "text-red-600"}">
+                        ${u.active ? "Active" : "Inactive"}
+                    </div>
+                </div>
+            </div>
+        </div>
+    `).join('');
+
+            pushActivity('Loaded users (' + users.length + ')');
+        }
+
+        async function openUserEdit(userId) {
+            const { data: user, raw, status } = await fetchJson(
+                `${API}/users/${userId}`,
+                { headers: adminHeaders() }
+            );
+
+            if (status !== 200) {
+                showToast(raw?.error?.message || "Failed to load user", "error");
+                return;
+            }
+
+            openModal('Edit User', `
+        <div class="space-y-2">
+            <label class="block text-sm">Username</label>
+            <input id="edit-username" class="w-full px-3 py-2 border rounded"
+                   value="${escapeHtml(user.username || user.name || '')}" />
+
+            <label class="block text-sm">Email</label>
+            <input id="edit-email" class="w-full px-3 py-2 border rounded"
+                   value="${escapeHtml(user.email || '')}" />
+
+            <label class="block text-sm">Age</label>
+            <input id="edit-age" type="number" class="w-full px-3 py-2 border rounded"
+                   value="${user.age || 0}" />
+
+            <label class="block text-sm">Active</label>
+            <select id="edit-active" class="w-full px-3 py-2 border rounded">
+                <option value="true" ${user.active ? 'selected' : ''}>Active</option>
+                <option value="false" ${!user.active ? 'selected' : ''}>Inactive</option>
+            </select>
+
+            <div class="flex gap-2 mt-4">
+                <button id="save-user" class="px-3 py-2 bg-green-600 text-white rounded">Save</button>
+                <button id="delete-user" class="px-3 py-2 bg-red-600 text-white rounded">Delete</button>
+                <button class="px-3 py-2 bg-gray-200 rounded" onclick="closeModal()">Cancel</button>
+            </div>
+        </div>
+    `);
+
+            document.getElementById('save-user').addEventListener('click', async () => {
+                const payload = {
+                    username: document.getElementById('edit-username').value.trim(),
+                    name: document.getElementById('edit-username').value.trim(),
+                    email: document.getElementById('edit-email').value.trim(),
+                    age: Number(document.getElementById('edit-age').value),
+                    active: document.getElementById('edit-active').value === 'true'
+                };
+
+                const { status } = await fetchJson(`${API}/users/${userId}`, {
+                    method: 'PATCH',
+                    headers: adminHeaders(),
+                    body: JSON.stringify(payload)
+                });
+
+                if (status === 200) {
+                    showToast('User updated', 'success');
+                    loadUsers();
+                    closeModal();
+                    pushActivity('Updated user #' + userId);
+                } else {
+                    showToast('Failed to update user', 'error');
+                }
+            });
+
+            document.getElementById('delete-user').addEventListener('click', async () => {
+                if (!confirm('Delete this user?')) return;
+
+                const { status } = await fetchJson(`${API}/users/${userId}`, {
+                    method: 'DELETE',
+                    headers: adminHeaders()
+                });
+
+                if (status === 200) {
+                    showToast('User deleted', 'success');
+                    loadUsers();
+                    closeModal();
+                    pushActivity('Deleted user #' + userId);
+                } else {
+                    showToast('Failed to delete user', 'error');
+                }
+            });
+        }
+
+        let commentsPage = 1;
+        document.getElementById('btn-refresh-comments').addEventListener('click', () => loadComments());
+        document.getElementById('comments-prev').addEventListener('click', () => loadComments(commentsPage - 1));
+        document.getElementById('comments-next').addEventListener('click', () => loadComments(commentsPage + 1));
+        document.getElementById('comments-search').addEventListener('keypress', e => { if (e.key === 'Enter') loadComments(1); });
+
+        async function loadComments(page = 1) {
+            commentsPage = page;
+
+            const q = document.getElementById('comments-search').value.trim();
+            const filter = document.getElementById('comments-filter').value;
+
+            const params = new URLSearchParams({ page, limit: 15 });
+            if (q) params.set('search', q);
+            if (filter === 'approved') params.set('approved', 'true');
+            if (filter === 'pending') params.set('approved', 'false');
+
+            const { data, raw, status } = await fetchJson(`${API}/comments?${params}`, { headers: adminHeaders() });
+
+            if (status !== 200) {
+                showToast(raw?.error?.message || 'Failed to load comments', 'error');
+                return;
+            }
+
+            const comments = data || [];
+
+            const pag = raw?.pagination || {
+                page: 1,
+                totalPages: 1,
+                total: 0,
+                hasPrev: false,
+                hasNext: false
+            };
+
+            const list = document.getElementById('comments-list');
+            list.innerHTML = comments.map(c => `
+        <div class="p-3 border rounded bg-white flex justify-between items-start">
+            <div>
+                <div class="text-sm text-gray-800">"${escapeHtml(c.text)}"</div>
+                <div class="text-xs text-gray-500 mt-1">Post ${c.postId} • User ${c.userId}</div>
+            </div>
+
+            <div class="flex flex-col gap-2 items-end">
+                <div class="text-xs ${c.approved ? 'text-green-600' : 'text-yellow-600'} font-semibold">
+                    ${c.approved ? 'Approved' : 'Pending'}
+                </div>
+                <div class="flex gap-2">
+                    ${!c.approved ? `
+                        <button class="px-2 py-1 bg-green-600 text-white text-xs rounded"
+                                onclick="approveComment(${c.id})">Approve</button>
+                    ` : ''}
+
+                    <button class="px-2 py-1 bg-red-600 text-white text-xs rounded"
+                            onclick="deleteComment(${c.id})">Delete</button>
+                </div>
+            </div>
+        </div>
+    `).join('');
+
+            document.getElementById('comments-page-info').textContent =
+                `Page ${pag.page} / ${pag.totalPages} — ${pag.total} comments`;
+
+            document.getElementById('comments-prev').disabled = !pag.hasPrev;
+            document.getElementById('comments-next').disabled = !pag.hasNext;
+
+            pushActivity('Loaded comments page ' + pag.page);
+        }
+
+        async function approveComment(id) {
+            const { status } = await fetchJson(`${API}/comments/${id}/approve`, { method: 'PATCH', headers: adminHeaders() });
+            if (status === 200) {
+                showToast('Comment approved', 'success');
+                loadComments();
+                pushActivity('Approved comment #' + id);
+            } else showToast('Failed to approve', 'error');
+        }
+
+        async function deleteComment(id) {
+            if (!confirm('Delete comment?')) return;
+            try {
+                const { status } = await fetchJson(`${API}/comments/${id}`, { method: 'DELETE', headers: adminHeaders() });
+                if (status === 200) {
+                    showToast('Comment deleted', 'success');
+                    loadComments();
+                    pushActivity('Deleted comment #' + id);
+                } else {
+                    showToast('Delete failed (not implemented)', 'error');
+                }
+            } catch (err) {
+                showToast('Delete failed (network)', 'error');
+            }
+        }
+
+
+        function openCreateMenu() {
+            openModal('Create new', `
+    <div class="grid grid-cols-3 gap-3" style="display: flex; flex-direction: column;">
+      <button class="col-span-1 p-4 border rounded text-center" onclick="openPostCreate()">Post</button>
+      <button class="col-span-1 p-4 border rounded text-center" onclick="openUserCreate()">User</button>
+      <button class="col-span-1 p-4 border rounded text-center" onclick="openCommentCreate()">Comment</button>
+    </div>
+  `);
+        }
+
+        function openPostCreate() {
+            openModal('Create Post', `
+    <div id="create-post-form" class="space-y-3">
+      <label class="text-sm">Title</label>
+      <input id="post-title" class="w-full px-3 py-2 border rounded" />
+      <label class="text-sm">Content</label>
+      <textarea id="post-content" class="w-full px-3 py-2 border rounded" rows="6"></textarea>
+      <label class="inline-flex items-center gap-2"><input id="post-published" type="checkbox" /> Publish immediately</label>
+      <div class="flex gap-2">
+        <button id="create-post-submit" class="px-3 py-2 bg-green-600 text-white rounded">Create</button>
+        <button class="px-3 py-2 bg-gray-200 rounded" onclick="closeModal()">Cancel</button>
+      </div>
+    </div>
+  `);
+            document.getElementById('create-post-submit').addEventListener('click', async () => {
+                const title = document.getElementById('post-title').value.trim();
+                const content = document.getElementById('post-content').value.trim();
+                const published = document.getElementById('post-published').checked;
+                if (!title || title.length < 5) return showToast('Title is required (min 5 chars)', 'error');
+                if (!content || content.length < 10) return showToast('Content is required (min 10 chars)', 'error');
+                const payload = { title, content, published };
+                const { status } = await fetchJson(`${API}/posts`, { method: 'POST', headers: adminHeaders(), body: JSON.stringify(payload) });
+                if (status === 200 || status === 201) {
+                    showToast('Post created', 'success');
+                    closeModal(); loadPosts(); pushActivity('Created post: ' + title);
+                } else showToast('Failed to create post', 'error');
+            });
+        }
+
+        function openUserCreate() {
+            openModal('Create User', `
+    <div id="create-user-form" class="space-y-3">
+      <label class="text-sm">Username</label>
+      <input id="user-username" class="w-full px-3 py-2 border rounded" />
+      <label class="text-sm">Email</label>
+      <input id="user-email" class="w-full px-3 py-2 border rounded" />
+      <label class="text-sm">Age</label>
+      <input id="user-age" type="number" class="w-full px-3 py-2 border rounded" />
+      <label class="inline-flex items-center gap-2"><input id="user-active" type="checkbox" checked /> Active</label>
+      <div class="flex gap-2">
+        <button id="create-user-submit" class="px-3 py-2 bg-green-600 text-white rounded">Create</button>
+        <button class="px-3 py-2 bg-gray-200 rounded" onclick="closeModal()">Cancel</button>
+      </div>
+    </div>
+  `);
+            document.getElementById('create-user-submit').addEventListener('click', async () => {
+                const username = document.getElementById('user-username').value.trim();
+                const email = document.getElementById('user-email').value.trim();
+                const age = Number(document.getElementById('user-age').value);
+                const active = document.getElementById('user-active').checked;
+                if (!username || username.length < 3) return showToast('Username min 3 chars', 'error');
+                if (!/^\S+@\S+\.\S+$/.test(email)) return showToast('Invalid email', 'error');
+                if (!age || age <= 0) return showToast('Invalid age', 'error');
+                const payload = { username, email, age, active };
+                const { status, data, error, message } = await fetchJson(`${API}/users`, { method: 'POST', headers: adminHeaders(), body: JSON.stringify(payload) });
+                if (status === 200) {
+                    showToast('User created', 'success');
+                    closeModal();
+                    loadUsers();
+                    pushActivity('Created user: ' + username);
+                } else {
+                    showToast(error?.message || message || 'Unknown error', 'error');
+                }
+            });
+        }
+
+        async function openCommentCreate() {
+            const { data: posts } = await fetchJson(`${API}/posts?limit=999`, { headers: adminHeaders() });
+            const postOptions = (posts || [])
+                .map(p => `<option value="${p.id}">#${p.id} — ${escapeHtml(p.title)}</option>`)
+                .join("");
+
+            openModal('Create Comment', `
+        <div id="create-comment-form" class="space-y-3">
+
+            <label class="text-sm">Post</label>
+            <select id="comment-post" class="w-full px-3 py-2 border rounded">
+                ${postOptions}
+            </select>
+
+            <label class="text-sm">Text</label>
+            <textarea id="comment-text" class="w-full px-3 py-2 border rounded" rows="4"></textarea>
+
+            <div class="flex gap-2">
+                <button id="create-comment-submit" class="px-3 py-2 bg-green-600 text-white rounded">Create</button>
+                <button class="px-3 py-2 bg-gray-200 rounded" onclick="closeModal()">Cancel</button>
+            </div>
+
+        </div>
+    `);
+
+            document.getElementById('create-comment-submit').addEventListener('click', async () => {
+                const postId = Number(document.getElementById('comment-post').value);
+                const text = document.getElementById('comment-text').value.trim();
+
+                if (!postId || postId <= 0)
+                    return showToast('Please select a post', 'error');
+
+                if (!text || text.length < 3)
+                    return showToast('Comment too short', 'error');
+
+                const payload = { postId, text };
+
+                const { status } = await fetchJson(`${API}/comments`, {
+                    method: 'POST',
+                    headers: adminHeaders(),
+                    body: JSON.stringify(payload)
+                });
+
+                if (status === 200 || status === 201) {
+                    showToast('Comment created (pending approval)', 'success');
+                    closeModal();
+                    loadComments();
+                    pushActivity('Created comment on post #' + postId);
+                } else {
+                    showToast('Failed to create comment', 'error');
+                }
+            });
+        }
+
+        async function openPostView(id) {
+            const postRes = await fetchJson(`${API}/posts/${id}`, { headers: adminHeaders() });
+            if (postRes.status !== 200) return showToast('Post not found', 'error');
+
+            const post = postRes.data;
+
+            let user = null;
+            if (post.userId) {
+                const userRes = await fetchJson(`${API}/users/${post.userId}`, { headers: adminHeaders() });
+                user = userRes.data || null;
+            }
+
+            const commentsRes = await fetchJson(`${API}/comments?postId=${id}`, { headers: adminHeaders() });
+            const comments = commentsRes.data || [];
+
+            openModal(`Post #${id}`, `
+        <div class="space-y-4">
+
+            <h2 class="text-2xl font-bold text-indigo-700">${escapeHtml(post.title)}</h2>
+            <p class="text-gray-800 whitespace-pre-line">${escapeHtml(post.content)}</p>
+
+            <div class="text-sm text-gray-600 mt-2">
+                <strong>Auteur :</strong> 
+                ${user ? escapeHtml(user.username || user.name) : "Unknown"} <br>
+                <strong>Date :</strong> ${new Date(post.createdAt).toLocaleString()} <br>
+                <strong>Status :</strong> 
+                ${post.published
+                    ? '<span class="text-green-600 font-semibold">Published</span>'
+                    : '<span class="text-yellow-600 font-semibold">Draft</span>'}
+            </div>
+
+            <hr>
+
+            <h3 class="text-lg font-semibold">Commentaires (${comments.length})</h3>
+
+            <div class="space-y-2">
+                ${comments.length === 0
+                    ? "<p class='text-gray-500'>Aucun commentaire.</p>"
+                    : comments.map(c => `
+                        <div class="p-3 border rounded bg-gray-50">
+                            <div class="text-sm text-gray-800">"${escapeHtml(c.text)}"</div>
+                            <div class="text-xs text-gray-500 mt-1">
+                                By User ${c.userId} — ${c.approved ? "Approved" : "Pending"}
+                            </div>
+                        </div>
+                    `).join('')}
+            </div>
+
+            <div class="flex gap-3 mt-4">
+                <button class="px-3 py-2 bg-indigo-600 text-white rounded" onclick="openPostEdit(${id})">Edit</button>
+                <button class="px-3 py-2 bg-gray-200 rounded" onclick="closeModal()">Close</button>
+            </div>
+
+        </div>
+    `);
+        }
+
+
+        async function init() {
+            const postsResp = await fetchJson(`${API}/posts?page=1&limit=200`, { headers: adminHeaders() });
+            const usersResp = await fetchJson(`${API}/users?page=1&limit=200`, { headers: adminHeaders() });
+            const commentsResp = await fetchJson(`${API}/comments?page=1&limit=500`, { headers: adminHeaders() });
+
+            const posts = postsResp.data || [];
+            const users = usersResp.data || [];
+            const comments = commentsResp.data || [];
+
+            document.getElementById('stat-posts').textContent = posts.length;
+            pushActivity('Fetched posts count ' + posts.length);
+
+            document.getElementById('stat-users').textContent = users.length;
+            pushActivity('Loaded posts page ' + users.length);
+
+            const pending = comments.filter(c => !c.approved).length;
+            document.getElementById('stat-pending').textContent = pending;
+            pushActivity('Loaded posts page ' + pending);
+        }
+
+
+        (async () => {
+            const ok = await checkApi();
+            if (!ok) return;
+
+            await init();
+
+            // POSTS
+            autoRefresh('posts-search', 'input', () => loadPosts(1));
+            autoRefresh('posts-sort', 'change', () => loadPosts(1));
+            autoRefresh('posts-filter-published', 'change', () => loadPosts(1));
+
+            // USERS
+            autoRefresh('users-search', 'input', loadUsers);
+            autoRefresh('users-sort', 'change', loadUsers);
+
+            // COMMENTS
+            autoRefresh('comments-search', 'input', () => loadComments(1));
+            autoRefresh('comments-filter', 'change', () => loadComments(1));
+
+
+            function autoRefresh(id, event, callback) {
+                document.getElementById(id).addEventListener(event, callback);
+            }
+
+            document.getElementById('modal-backdrop').addEventListener('click', (e) => {
+                const modal = document.getElementById('modal');
+                if (!modal.contains(e.target)) {
+                    closeModal();
+                }
+            });
+
+            document.getElementById('modal').addEventListener('click', e => {
+                e.stopPropagation();
+            });
+
+            document.addEventListener('keydown', (e) => {
+                if (e.key === 'Escape') {
+                    closeModal();
+                }
+            });
+        })();
+
+        function escapeHtml(str) {
+            if (str == null) return '';
+            return String(str)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#039;');
+        }
+    </script>
+</body>
+
+</html>

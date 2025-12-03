@@ -1,0 +1,45 @@
+[
+  {
+    "id": 1,
+    "username": "john_doe",
+    "email": "john@example.com",
+    "age": 30,
+    "active": true
+  },
+  {
+    "id": 2,
+    "username": "jane_smith_edited",
+    "email": "jane@example.com",
+    "age": 25,
+    "active": false
+  },
+  {
+    "id": 3,
+    "username": "mike_wilson",
+    "email": "mike@example.com",
+    "age": 35,
+    "active": true
+  },
+  {
+    "id": 4,
+    "username": "sarah_lee",
+    "email": "sarah@example.com",
+    "age": 28,
+    "active": true
+  },
+  {
+    "id": 5,
+    "username": "alex_cool",
+    "email": "alex@example.com",
+    "age": 32,
+    "active": false
+  },
+  {
+    "id": 6,
+    "username": "test",
+    "email": "test@livr.fr",
+    "age": 10,
+    "active": true,
+    "createdAt": "2025-12-03T16:57:54.446Z"
+  }
+]

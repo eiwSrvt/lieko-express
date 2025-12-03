@@ -1,0 +1,426 @@
+[
+  {
+    "id": 1,
+    "title": "First Post Ever",
+    "content": "Hello World! This is my first post.",
+    "userId": 1,
+    "published": true,
+    "createdAt": "2025-01-15T10:00:00Z"
+  },
+  {
+    "id": 2,
+    "title": "Learning Lieko",
+    "content": "Lieko is incredibly fast and lightweight!",
+    "userId": 1,
+    "published": false,
+    "createdAt": "2025-01-20T14:30:00Z"
+  },
+  {
+    "id": 3,
+    "title": "Lieko is amazing",
+    "content": "Zero dependencies, pure Node.js power!",
+    "userId": 1,
+    "published": true,
+    "createdAt": "2025-01-25T09:15:00Z"
+  },
+  {
+    "id": 4,
+    "title": "Why I chose Lieko over Express",
+    "content": "Performance, simplicity, and full control.",
+    "userId": 2,
+    "published": true,
+    "createdAt": "2025-01-26T11:20:00Z"
+  },
+  {
+    "id": 5,
+    "title": "Building APIs in 2025",
+    "content": "The future is minimal and performant.",
+    "userId": 3,
+    "published": true,
+    "createdAt": "2025-01-27T16:45:00Z"
+  },
+  {
+    "id": 6,
+    "title": "Node.js without bloat",
+    "content": "Sometimes less is more.",
+    "userId": 1,
+    "published": true,
+    "createdAt": "2025-01-28T08:10:00Z"
+  },
+  {
+    "id": 7,
+    "title": "My journey with Lieko Express",
+    "content": "From idea to production in 2 days.",
+    "userId": 4,
+    "published": true,
+    "createdAt": "2025-01-29T13:55:00Z"
+  },
+  {
+    "id": 8,
+    "title": "Pagination done right",
+    "content": "How to implement clean REST pagination.",
+    "userId": 2,
+    "published": true,
+    "createdAt": "2025-01-30T10:30:00Z"
+  },
+  {
+    "id": 9,
+    "title": "Validation in Lieko",
+    "content": "15+ built-in validators, zero deps.",
+    "userId": 3,
+    "published": true,
+    "createdAt": "2025-01-31T15:20:00Z"
+  },
+  {
+    "id": 10,
+    "title": "Rate limiting made simple",
+    "content": "Protect your API with a few lines.",
+    "userId": 1,
+    "published": true,
+    "createdAt": "2025-02-01T09:00:00Z"
+  },
+  {
+    "id": 11,
+    "title": "Deploying Lieko to production",
+    "content": "PM2, Docker, Nginx — all covered.",
+    "userId": 5,
+    "published": false,
+    "createdAt": "2025-02-02T12:15:00Z"
+  },
+  {
+    "id": 12,
+    "title": "File uploads in Lieko",
+    "content": "Multipart handling without external libs.",
+    "userId": 2,
+    "published": true,
+    "createdAt": "2025-02-03T14:40:00Z"
+  },
+  {
+    "id": 13,
+    "title": "Authentication strategies",
+    "content": "JWT, sessions, or API keys?",
+    "userId": 3,
+    "published": true,
+    "createdAt": "2025-02-04T11:25:00Z"
+  },
+  {
+    "id": 14,
+    "title": "Error handling best practices",
+    "content": "Never let your API crash silently.",
+    "userId": 4,
+    "published": true,
+    "createdAt": "2025-02-05T17:10:00Z"
+  },
+  {
+    "id": 15,
+    "title": "Testing Lieko APIs",
+    "content": "Supertest, Jest, and native fetch.",
+    "userId": 1,
+    "published": true,
+    "createdAt": "2025-02-06T10:05:00Z"
+  },
+  {
+    "id": 16,
+    "title": "The beauty of res.paginated()",
+    "content": "One line for perfect pagination.",
+    "userId": 2,
+    "published": true,
+    "createdAt": "2025-02-07T13:30:00Z"
+  },
+  {
+    "id": 17,
+    "title": "CORS configuration tips",
+    "content": "Don't block yourself in dev!",
+    "userId": 3,
+    "published": true,
+    "createdAt": "2025-02-08T09:50:00Z"
+  },
+  {
+    "id": 18,
+    "title": "Logging requests like a pro",
+    "content": "Microseconds, colors, and IP detection.",
+    "userId": 1,
+    "published": true,
+    "createdAt": "2025-02-09T16:20:00Z"
+  },
+  {
+    "id": 19,
+    "title": "Lieko vs Fastify vs Express",
+    "content": "Benchmark results inside.",
+    "userId": 4,
+    "published": true,
+    "createdAt": "2025-02-10T11:45:00Z"
+  },
+  {
+    "id": 20,
+    "title": "OpenAPI generation from routes",
+    "content": "Coming soon...",
+    "userId": 5,
+    "published": false,
+    "createdAt": "2025-02-11T14:00:00Z"
+  },
+  {
+    "id": 21,
+    "title": "Mastering middleware order",
+    "content": "What runs when?",
+    "userId": 1,
+    "published": true,
+    "createdAt": "2025-02-12T10:30:00Z"
+  },
+  {
+    "id": 22,
+    "title": "Async middlewares in Lieko",
+    "content": "No callback hell!",
+    "userId": 2,
+    "published": true,
+    "createdAt": "2025-02-13T15:15:00Z"
+  },
+  {
+    "id": 23,
+    "title": "Graceful shutdown",
+    "content": "Close connections properly.",
+    "userId": 3,
+    "published": true,
+    "createdAt": "2025-02-14T12:00:00Z"
+  },
+  {
+    "id": 24,
+    "title": "Health checks endpoint",
+    "content": "For Kubernetes and load balancers.",
+    "userId": 1,
+    "published": true,
+    "createdAt": "2025-02-15T09:20:00Z"
+  },
+  {
+    "id": 25,
+    "title": "Rate limiting per IP",
+    "content": "Simple in-memory solution.",
+    "userId": 4,
+    "published": true,
+    "createdAt": "2025-02-16T17:40:00Z"
+  },
+  {
+    "id": 26,
+    "title": "Caching strategies",
+    "content": "Redis? Memory? File?",
+    "userId": 2,
+    "published": true,
+    "createdAt": "2025-02-17T11:10:00Z"
+  },
+  {
+    "id": 27,
+    "title": "WebSocket support coming?",
+    "content": "Community is working on it!",
+    "userId": 5,
+    "published": false,
+    "createdAt": "2025-02-18T13:55:00Z"
+  },
+  {
+    "id": 28,
+    "title": "Dockerizing Lieko apps",
+    "content": "Multi-stage builds for tiny images.",
+    "userId": 3,
+    "published": true,
+    "createdAt": "2025-02-19T10:25:00Z"
+  },
+  {
+    "id": 29,
+    "title": "Environment variables best practices",
+    "content": "Never hardcode secrets. f",
+    "userId": 1,
+    "published": true,
+    "createdAt": "2025-02-20T16:50:00Z"
+  },
+  {
+    "id": 30,
+    "title": "Monitoring with Prometheus",
+    "content": "Expose /metrics endpoint.",
+    "userId": 2,
+    "published": true,
+    "createdAt": "2025-02-21T14:30:00Z"
+  },
+  {
+    "id": 31,
+    "title": "Lieko + TypeScript",
+    "content": "Full type safety possible.",
+    "userId": 4,
+    "published": true,
+    "createdAt": "2025-02-22T09:15:00Z"
+  },
+  {
+    "id": 32,
+    "title": "Database migration tips",
+    "content": "From in-memory to PostgreSQL.",
+    "userId": 3,
+    "published": true,
+    "createdAt": "2025-02-23T12:40:00Z"
+  },
+  {
+    "id": 33,
+    "title": "Security headers",
+    "content": "HSTS, CSP, X-Frame-Options...",
+    "userId": 1,
+    "published": true,
+    "createdAt": "2025-02-24T11:00:00Z"
+  },
+  {
+    "id": 34,
+    "title": "Lieko in serverless",
+    "content": "AWS Lambda, Vercel, Cloudflare Workers.",
+    "userId": 5,
+    "published": false,
+    "createdAt": "2025-02-25T15:20:00Z"
+  },
+  {
+    "id": 35,
+    "title": "Real-time notifications",
+    "content": "With SSE or WebSocket.",
+    "userId": 2,
+    "published": true,
+    "createdAt": "2025-02-26T10:05:00Z"
+  },
+  {
+    "id": 36,
+    "title": "GraphQL vs REST in 2025",
+    "content": "My take after 10 years.",
+    "userId": 3,
+    "published": true,
+    "createdAt": "2025-02-27T13:45:00Z"
+  },
+  {
+    "id": 37,
+    "title": "The joy of small bundles",
+    "content": "Lieko starts in < 5ms.",
+    "userId": 1,
+    "published": true,
+    "createdAt": "2025-02-28T17:30:00Z"
+  },
+  {
+    "id": 38,
+    "title": "Writing clean controllers",
+    "content": "Separation of concerns.",
+    "userId": 4,
+    "published": true,
+    "createdAt": "2025-03-01T09:50:00Z"
+  },
+  {
+    "id": 39,
+    "title": "Testing file Uploads",
+    "content": "With supertest and buffer.",
+    "userId": 2,
+    "published": true,
+    "createdAt": "2025-03-02T14:15:00Z"
+  },
+  {
+    "id": 40,
+    "title": "Lieko roadmap 2025",
+    "content": "WebSockets, plugins, CLI...",
+    "userId": 1,
+    "published": true,
+    "createdAt": "2025-03-03T11:30:00Z"
+  },
+  {
+    "id": 41,
+    "title": "From Express to Lieko",
+    "content": "My migration story.",
+    "userId": 3,
+    "published": true,
+    "createdAt": "2025-03-04T16:20:00Z"
+  },
+  {
+    "id": 42,
+    "title": "Performance tips",
+    "content": "Trust proxy, keep-alive, clustering.",
+    "userId": 5,
+    "published": false,
+    "createdAt": "2025-03-05T10:10:00Z"
+  },
+  {
+    "id": 43,
+    "title": "Internationalization (i18n)",
+    "content": "Multi-language APIs.",
+    "userId": 2,
+    "published": false,
+    "createdAt": "2025-03-06T12:55:00Z"
+  },
+  {
+    "id": 44,
+    "title": "API versioning strategies",
+    "content": "URL, headers, or media types?",
+    "userId": 4,
+    "published": false,
+    "createdAt": "2025-03-07T15:40:00Z"
+  },
+  {
+    "id": 45,
+    "title": "Background jobs",
+    "content": "With BullMQ or simple queue.",
+    "userId": 1,
+    "published": true,
+    "createdAt": "2025-03-08T09:25:00Z"
+  },
+  {
+    "id": 46,
+    "title": "Email sending in Node.js",
+    "content": "Nodemailer + templates.",
+    "userId": 3,
+    "published": false,
+    "createdAt": "2025-03-09T13:15:00Z"
+  },
+  {
+    "id": 47,
+    "title": "Rate limiting with Redis",
+    "content": "For distributed environments.",
+    "userId": 2,
+    "published": true,
+    "createdAt": "2025-03-10T11:00:00Z"
+  },
+  {
+    "id": 48,
+    "title": "OpenAPI + Lieko",
+    "content": "Auto-document your API.",
+    "userId": 1,
+    "published": true,
+    "createdAt": "2025-03-11T14:45:00Z"
+  },
+  {
+    "id": 49,
+    "title": "The power of res.created()",
+    "content": "Consistency across your API.",
+    "userId": 4,
+    "published": true,
+    "createdAt": "2025-03-12T10:30:00Z"
+  },
+  {
+    "id": 50,
+    "title": "Thank you Lieko community!",
+    "content": "50 posts and counting!\n\nedit: from update",
+    "userId": 1,
+    "published": true,
+    "createdAt": "2025-03-13T16:00:00Z"
+  },
+  {
+    "id": 51,
+    "title": "New post",
+    "content": "Fresh post",
+    "published": true,
+    "userId": 1,
+    "createdAt": "2025-12-03T17:07:31.501Z"
+  },
+  {
+    "id": 52,
+    "title": "test post",
+    "content": "other post",
+    "published": false,
+    "userId": 1,
+    "createdAt": "2025-12-03T17:08:30.909Z"
+  },
+  {
+    "id": 53,
+    "title": "test 2",
+    "content": "test content post",
+    "published": false,
+    "userId": 1,
+    "createdAt": "2025-12-03T22:29:00.810Z"
+  }
+]
