@@ -102,7 +102,7 @@ app.get('/', (req, res) => {
 app.listen(3000, () => {
   console.log('Server running on port 3000');
 });
----
+```
 
 ## 🎯 Basic Usage
 
@@ -201,7 +201,7 @@ app.group('/api', auth, (api) => {
 * You can nest indefinitely
 * Works inside routers too
 
----
+
 
 # 📦 Nested Routers
 
@@ -248,7 +248,8 @@ api.group(
 ### ✔ Paths automatically expanded
 
 ### ✔ Perfect for modular architecture
----
+
+
 # 🧩 API Versioning
 
 With groups, versioning becomes trivial:
@@ -263,7 +264,6 @@ app.group('/api/v2', (v2) => {
 });
 ```
 
----
 
 ### Query Parameters
 
@@ -291,7 +291,6 @@ app.get('/search', (req, res) => {
 - `"true"` → `true` (boolean)
 - `"false"` → `false` (boolean)
 
----
 
 ## 🔧 Middlewares
 
@@ -375,7 +374,6 @@ app.use(async (req, res, next) => {
 });
 ```
 
----
 
 # 🔍 Request Object
 
@@ -414,8 +412,6 @@ Lieko safely handles:
 * IPv4-mapped IPv6
 * Multiple proxies
 
----
-
 
 # 🎯 Response Object (`res`)
 
@@ -434,7 +430,6 @@ Lieko enhances Node's native response object with convenient helper methods.
 | `res.json(obj)`            | Sends JSON with correct headers.         |
 | `res.end(body)`            | Ends the response manually.              |
 
----
 
 # ✅ **High-Level Helpers**
 
@@ -447,7 +442,6 @@ Lieko enhances Node's native response object with convenient helper methods.
 | `res.noContent()`        | Sends status `204` with no body.                   |
 | `res.paginated(payload)` | Standard API pagination output.                    |
 
----
 
 # ❌ **Error Helpers**
 
@@ -466,8 +460,6 @@ Lieko enhances Node's native response object with convenient helper methods.
 > { "success": false, "error": { "code": "...", "message": "..." } }
 > ```
 
----
-
 # 🧠 **Content-Type Helpers**
 
 ### **HTML**
@@ -482,7 +474,6 @@ Lieko enhances Node's native response object with convenient helper methods.
 | -------------------------- | ------------------------------------- |
 | `res.redirect(url, code?)` | Redirects the client (default `302`). |
 
----
 
 # 📦 **Low-Level Output Controls**
 
@@ -514,8 +505,6 @@ res.paginated(items, page, limit, total);
 * Automatic status codes
 * Error code → HTTP mapping
 * String errors also supported (`res.error("Invalid user")`)
-
----
 
 # 📦 Body Parsing
 
@@ -620,8 +609,6 @@ app.post('/upload', (req, res) => {
   res.json({ uploaded: true });
 });
 ```
-
----
 
 ## ✅ Validation
 
@@ -740,8 +727,6 @@ const userSchema = schema({
 });
 ```
 
----
-
 ## **Boolean Example**
 
 ```js
@@ -758,8 +743,6 @@ Accepted:
 true, false, "true", "false", 1, 0, "1", "0"
 ```
 
----
-
 ## **Email Example**
 
 ```js
@@ -770,8 +753,6 @@ const schema = schema({
   ]
 });
 ```
-
----
 
 ## **Username with rules**
 
@@ -786,8 +767,6 @@ const usernameSchema = schema({
   ]
 });
 ```
-
----
 
 ## **Password strength**
 
@@ -806,8 +785,6 @@ const passwordSchema = schema({
 });
 ```
 
----
-
 ## **Multiple-choice fields**
 
 ```js
@@ -818,7 +795,6 @@ const roleSchema = schema({
 });
 ```
 
----
 
 ## **Blacklist Example**
 
@@ -830,8 +806,6 @@ const schema = schema({
 });
 ```
 
----
-
 ## **Starts / Ends With**
 
 ```js
@@ -842,11 +816,9 @@ const schema = schema({
 });
 ```
 
----
-
 # **Advanced Validation Examples**
 
----
+
 
 ## **Cross-field validation (matching passwords)**
 
@@ -863,7 +835,6 @@ const registerSchema = schema({
 });
 ```
 
----
 
 ## Conditional Validation (depends on another field)
 
@@ -880,7 +851,6 @@ const orderSchema = schema({
 });
 ```
 
----
 
 ## Dynamic rules EX: `age` required only if user is not admin
 
@@ -896,7 +866,6 @@ const schema = schema({
 });
 ```
 
----
 
 ## **Date validation**
 
@@ -912,7 +881,6 @@ const eventSchema = schema({
 });
 ```
 
----
 
 # **Combining many validators**
 
@@ -928,7 +896,6 @@ const schema = schema({
 });
 ```
 
----
 
 # **Optional field + rules if provided**
 
@@ -945,7 +912,6 @@ const schema = schema({
 If nickname is empty → no validation.
 If present → must follow rules.
 
----
 
 # **Example of validation error response**
 
@@ -1014,7 +980,6 @@ const orderSchema = schema({
 });
 ```
 
----
 
 ## 🗂️ Routers
 
@@ -1138,8 +1103,6 @@ app.use('/api/posts', postsRouter);
 app.listen(3000);
 ```
 
----
-
 ## ⚠️ Error Handling
 
 ### Custom 404 Handler
@@ -1208,7 +1171,6 @@ res.error({ code: 'CUSTOM_ERROR', status: 418 });
 }
 ```
 
----
 
 ## 🔥 Advanced Examples
 
@@ -1551,7 +1513,6 @@ const requestLogger = (req, res, next) => {
 app.use(requestLogger);
 ```
 
----
 
 ## 🎯 Complete Application Example
 
@@ -1564,7 +1525,6 @@ See the [examples](./examples) directory for a full-featured application with:
 - Middleware examples
 - Comprehensive test suite
 
----
 
 # 📊 Performance Tips (Suite)
 
@@ -1575,7 +1535,6 @@ See the [examples](./examples) directory for a full-featured application with:
 5. **Use reverse proxy headers correctly** (`trust proxy`) when hosting behind Nginx
 6. **Disable console logs in production** or use a real logger with adjustable log levels
 
----
 
 ## Debug & Introspection Tools
 
@@ -1720,7 +1679,6 @@ Lieko correctly handles:
 * IPv4-mapped IPv6 (`::ffff:127.0.0.1`)
 * Multi-proxy headers
 
----
 
 ## 🧩 Internals & Architecture
 
@@ -1754,8 +1712,6 @@ This allows:
 * Fast matching
 
 
----
-
 ## 🧱 Extending Lieko Express
 
 Because the framework is intentionally small, you can easily extend it.
@@ -1786,8 +1742,6 @@ const timing = (req, res, next) => {
 app.use(timing);
 ```
 
----
-
 # 🔌 Plugins
 
 A plugin is simply a function receiving `app`:
@@ -1799,7 +1753,6 @@ function myPlugin(app) {
 
 myPlugin(app);
 ```
----
 
 ## 🚀 Deploying Lieko Express
 
@@ -1862,7 +1815,7 @@ app.notFound((req, res) => {
 
 Register a custom 500 handler.
 
----
+
 
 ## 🔍 Known Limitations
 
@@ -1876,7 +1829,6 @@ Because Lieko Express is minimalistic:
 
 Future versions may address some of these.
 
----
 
 ## 🤝 Contributing
 
@@ -1887,7 +1839,7 @@ Contributions are welcome!
 3. Commit your changes
 4. Open a pull request
 
----
+
 
 ## 📄 License
 
