@@ -1,5 +1,10 @@
 {
   "name": "lieko-express",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/eiwSrvt/lieko-express"
+  },
+  "homepage": "https://github.com/eiwSrvt/lieko-express",
   "version": "0.0.2",
   "description": "Lieko-express — A Modern, Minimal, REST API Framework for Node.js",
   "main": "lieko-express.js",

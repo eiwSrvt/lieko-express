@@ -1,4 +1,4 @@
-# 📘 **Lieko-express — A Modern, Minimal, REST API Framework for Node.js**
+# **Lieko-express — A Modern, Minimal, REST API Framework for Node.js**
 
 A lightweight, fast, and modern Node.js REST API framework built on top of the native `http` module. Zero external dependencies for core functionality.
 
@@ -10,6 +10,10 @@ A lightweight, fast, and modern Node.js REST API framework built on top of the n
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Node.js Version](https://img.shields.io/badge/node-%3E%3D14.0.0-brightgreen)](https://nodejs.org)
+[![npm version](https://img.shields.io/npm/v/lieko-express.svg)](https://www.npmjs.com/package/lieko-express)
+
+[![GitHub](https://img.shields.io/badge/GitHub-Repository-black?logo=github)](https://github.com/eiwSrvt/lieko-express)
+[![Discord](https://img.shields.io/discord/1399525160050102414?color=5865F2&logo=discord&logoColor=white)](https://discord.gg/EpgPqjvd)
 
 
 
@@ -164,9 +168,13 @@ app.delete('/posts/:id', deletePost);
 ### Features
 
 ✔ Params automatically extracted
+
 ✔ Query auto-typed
+
 ✔ Body parsed and typed
+
 ✔ Wildcards available
+
 ✔ Trailing slashes handled intelligently
 
 ---
@@ -210,11 +218,11 @@ Routers are fully nestable:
 ```js
 const { Router } = require('lieko-express');
 
-const users = Router();
+const app = Router();
 
-users.get('/', listUsers);
-users.post('/', createUser);
-users.get('/:id', getUser);
+app.get('/', listUsers);
+app.post('/', createUser);
+app.get('/:id', getUser);
 
 app.group('/api', auth, (api) => {
   api.group('/admin', requireAdmin, (admin) => {
@@ -243,11 +251,11 @@ api.group(
   }
 );
 ```
-### ✔ Router inherits middleware from its parent groups
+✔ Router inherits middleware from its parent groups
 
-### ✔ Paths automatically expanded
+✔ Paths automatically expanded
 
-### ✔ Perfect for modular architecture
+✔ Perfect for modular architecture
 
 
 # 🧩 API Versioning
