@@ -5,7 +5,7 @@
     "url": "https://github.com/eiwSrvt/lieko-express"
   },
   "homepage": "https://github.com/eiwSrvt/lieko-express",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "description": "Lieko-express — A Modern, Minimal, REST API Framework for Node.js",
   "main": "lieko-express.js",
   "scripts": {

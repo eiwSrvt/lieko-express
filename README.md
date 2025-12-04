@@ -1649,9 +1649,9 @@ You can configure:
 ```js
 app.set('trust proxy', value);
 app.set('debug', boolean);
-app.set('x-powered-by', false);
-app.set('strictTrailingSlash', false);
-app.set('allowTrailingSlash', true);
+app.set('x-powered-by', boolean);
+app.set('strictTrailingSlash', boolean);
+app.set('allowTrailingSlash', boolean);
 ```
 
 # 🌐 Trust Proxy & IP Parsing
@@ -1761,15 +1761,6 @@ function myPlugin(app) {
 
 myPlugin(app);
 ```
-
-## 🚀 Deploying Lieko Express
-
-### Node.js (PM2)
-
-```bash
-pm2 start app.js
-```
-
 ## 📦 API Reference
 
 ### `Lieko()`
