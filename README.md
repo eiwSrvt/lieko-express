@@ -311,7 +311,7 @@ app.use((req, res, next) => {
   next();
 });
 
-// CORS middleware
+// CORS middleware (native, but you can use app.cors())
 app.use((req, res, next) => {
   res.set('Access-Control-Allow-Origin', '*');
   res.set('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE');
@@ -382,6 +382,380 @@ app.use(async (req, res, next) => {
 });
 ```
 
+# **CORS**
+
+
+Lieko-Express includes a **fully built-in, high-performance CORS engine**, with:
+
+* Global CORS (`app.cors()`)
+* Route-level CORS (`app.get("/test", { cors: {...} }, handler)`—coming soon if you want it)
+* Wildcard origins (`https://*.example.com`)
+* Multiple allowed origins
+* Strict mode (reject unknown origins)
+* Credential support
+* Private Network Access (Chrome PNA)
+* Debug logging
+* Full OPTIONS preflight support
+
+---
+
+# **Enable CORS Globally**
+
+```js
+app.cors();
+```
+
+This enables default permissive CORS:
+
+| Option                | Default                       |
+| --------------------- | ----------------------------- |
+| `origin`              | `"*"`                         |
+| `methods`             | all standard methods          |
+| `headers`             | `Content-Type, Authorization` |
+| `credentials`         | false                         |
+| `maxAge`              | 86400 (24h)                   |
+| `exposedHeaders`      | none                          |
+| `strictOrigin`        | false                         |
+| `allowPrivateNetwork` | false                         |
+
+---
+
+# **Custom Global CORS Options**
+
+```js
+app.cors({
+  origin: ["https://example.com", "https://api.example.com"],
+  methods: ["GET", "POST"],
+  headers: ["Content-Type", "Authorization", "X-Custom"],
+  credentials: true,
+  maxAge: 3600,
+  exposedHeaders: ["X-RateLimit-Remaining"],
+});
+```
+
+---
+
+# **Allow All Origins (Standard Mode)**
+
+```js
+app.cors({
+  origin: "*"
+});
+```
+
+⚠️ If you also set `credentials: true`, browsers will **reject** `*`.
+Lieko will still output `*` because that's the correct spec behavior.
+
+---
+
+# **Strict Origin Mode**
+
+Strict mode ensures the incoming `Origin` header **must match exactly** one of your allowed origins.
+
+```js
+app.cors({
+  origin: ["https://myapp.com"],
+  strictOrigin: true
+});
+```
+
+If the request comes from an unauthorized origin:
+
+```json
+HTTP 403
+{
+  "success": false,
+  "error": "Origin Forbidden",
+  "message": "Origin \"https://evil.com\" is not allowed"
+}
+```
+
+---
+
+# **Wildcard Origins**
+
+Lieko-Express supports Express-style wildcard patterns:
+
+### Allow any subdomain
+
+```js
+app.cors({
+  origin: "https://*.example.com"
+});
+```
+
+Matches:
+
+* `https://api.example.com`
+* `https://dashboard.example.com`
+
+Does not match:
+
+* `http://example.com`
+* `https://example.net`
+
+---
+
+# **Allow Private Network Access (Chrome PNA)**
+
+```js
+app.cors({
+  allowPrivateNetwork: true
+});
+```
+
+When Chrome sends:
+
+```
+Access-Control-Request-Private-Network: true
+```
+
+Lieko automatically responds:
+
+```
+Access-Control-Allow-Private-Network: true
+```
+
+# Route-Level CORS
+
+Lieko-Express allows each route to override or extend the global CORS settings using a `cors` property in the route options.
+This gives you fine-grained control over cross-origin behavior on a per-endpoint basis.
+
+Route-level CORS:
+
+* Overrides global CORS
+* Supports wildcards (`https://*.example.com`)
+* Supports strict mode
+* Sends its own preflight response
+* Automatically merges with the global configuration
+* Does **not** affect other routes
+
+---
+
+## Basic Example
+
+```js
+app.get("/public", {
+  cors: { origin: "*" }
+}, (req, res) => {
+  res.ok("Public endpoint with open CORS");
+});
+```
+
+This route allows requests from **any origin**, even if global CORS is configured differently.
+
+---
+
+## 🔒 Restrict a Sensitive Route
+
+```js
+app.post("/admin/login", {
+  cors: {
+    origin: "https://dashboard.myapp.com",
+    credentials: true,
+    strictOrigin: true
+  }
+}, (req, res) => {
+  res.ok("Login OK");
+});
+```
+
+### Result:
+
+* Only `https://dashboard.myapp.com` is allowed
+* Cookies / sessions allowed
+* Any other origin receives:
+
+```json
+{
+  "success": false,
+  "error": "Origin Forbidden",
+  "message": "Origin \"https://evil.com\" is not allowed"
+}
+```
+
+Status: **403 Forbidden**
+
+---
+
+## ✨ Wildcard Origins on a Route
+
+```js
+app.get("/api/data", {
+  cors: {
+    origin: "https://*.example.com"
+  }
+}, (req, res) => {
+  res.ok({ data: 123 });
+});
+```
+
+Matches:
+
+* `https://api.example.com`
+* `https://dashboard.example.com`
+
+---
+
+## ⚙️ Full Route-Level CORS Example
+
+```js
+app.get("/user/profile", {
+  cors: {
+    origin: [
+      "https://app.example.com",
+      "https://*.trusted.dev"
+    ],
+    methods: ["GET", "PATCH"],
+    headers: ["Content-Type", "Authorization"],
+    exposedHeaders: ["X-User-Id"],
+    credentials: true,
+    maxAge: 600,
+    strictOrigin: true,
+    allowPrivateNetwork: true,
+    debug: true
+  }
+}, (req, res) => {
+  res.ok({ profile: "OK" });
+});
+```
+
+---
+
+## 📌 How Route-Level CORS Works Internally
+
+When a request hits a route:
+
+1. If global CORS is enabled → apply it.
+2. If the route defines `cors` → merge with global config.
+3. Route CORS **overrides** global CORS.
+4. If request is `OPTIONS` (preflight) → return automatic CORS response.
+5. Otherwise → run route handler.
+
+This ensures predictable behavior.
+
+---
+
+## 📘 Route-Level CORS Options
+
+| Option                | Type       | Description                              |                                          |
+| --------------------- | ---------- | ---------------------------------------- | ---------------------------------------- |
+| `origin`              | `string    | string[]`                                | Allowed origins (`*`, domain, wildcard). |
+| `methods`             | `string[]` | Allowed HTTP methods.                    |                                          |
+| `headers`             | `string[]` | Allowed request headers.                 |                                          |
+| `exposedHeaders`      | `string[]` | Response headers exposed to the browser. |                                          |
+| `credentials`         | `boolean`  | Allow cookies/sessions.                  |                                          |
+| `maxAge`              | `number`   | Preflight cache lifetime (seconds).      |                                          |
+| `strictOrigin`        | `boolean`  | Reject non-matching origins with 403.    |                                          |
+| `allowPrivateNetwork` | `boolean`  | Enables Chrome Private Network Access.   |                                          |
+| `debug`               | `boolean`  | Logs detailed CORS decisions.            |                                          |
+
+---
+
+## 🧩 Interaction with Global CORS
+
+| Feature            | Global | Route         |
+| ------------------ | ------ | ------------- |
+| Origin             | ✔      | ✔ (overrides) |
+| Wildcards          | ✔      | ✔             |
+| Credentials        | ✔      | ✔             |
+| Strict Origin      | ✔      | ✔             |
+| Private Network    | ✔      | ✔             |
+| Debug Logging      | ✔      | ✔             |
+| Preflight Handling | ✔      | ✔             |
+| Overrides Global   | ❌      | ✔             |
+
+
+
+
+# **Enable CORS Debug Logging**
+
+```js
+app.cors({
+  debug: true
+});
+```
+
+Console output example:
+
+```
+[CORS DEBUG]
+Request: GET /users
+Origin: https://app.example.com
+Applied CORS Policy:
+  - Access-Control-Allow-Origin: https://app.example.com
+  - Access-Control-Allow-Methods: GET, POST, PUT, PATCH, DELETE, OPTIONS
+  - Access-Control-Allow-Headers: Content-Type, Authorization
+  - Max-Age: 86400
+Simple request handled normally
+```
+
+---
+
+# **Preflight Handling (OPTIONS)**
+
+Lieko-Express automatically handles it:
+
+### Request:
+
+```
+OPTIONS /login
+Access-Control-Request-Method: POST
+Access-Control-Request-Headers: Content-Type
+```
+
+### Lieko Response:
+
+```
+204 No Content
+Access-Control-Allow-Methods: GET, POST, PUT, PATCH, DELETE, OPTIONS
+Access-Control-Allow-Headers: Content-Type, Authorization
+Access-Control-Max-Age: 86400
+```
+
+---
+
+# **Credentials Support**
+
+```js
+app.cors({
+  credentials: true,
+  origin: "https://myapp.com"
+});
+```
+
+Response contains:
+
+```
+Access-Control-Allow-Credentials: true
+```
+
+---
+
+
+# **Disable CORS**
+
+Just don’t call `app.cors()`.
+CORS stays fully disabled.
+
+---
+
+# **Default CORS Configuration**
+
+```js
+this.corsOptions = {
+  enabled: false,
+  origin: "*",
+  strictOrigin: false,
+  allowPrivateNetwork: false,
+  methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+  headers: ["Content-Type", "Authorization"],
+  credentials: false,
+  maxAge: 86400,
+  exposedHeaders: [],
+  debug: false
+};
+```
 
 # 🔍 Request Object
 
@@ -514,15 +888,83 @@ res.paginated(items, page, limit, total);
 * Error code → HTTP mapping
 * String errors also supported (`res.error("Invalid user")`)
 
-# 📦 Body Parsing
+---
+# Body Parsing (JSON, URL-encoded, Multipart) — 100% Native, Zero Dependencies
 
-Lieko supports:
+Lieko Express ships with a **fast, secure, and fully native body parser** — no external packages, not even `body-parser`.
 
-### ✔ JSON
+As soon as you create your app, body parsing is **automatically enabled**:
 
-### ✔ URL-encoded
+```js
+const app = Lieko();   // Ready to handle JSON, form-data, files, etc.
+```
 
-### ✔ Multipart form-data (files)
+### Default Limits
+
+| Content-Type                          | Default Limit | Bytes             |
+|---------------------------------------|---------------|-------------------|
+| `application/json`                   | **1mb**       | ~1,048,576 bytes  |
+| `application/x-www-form-urlencoded`   | **1mb**       | ~1,048,576 bytes  |
+| `multipart/form-data` (file uploads)  | **10mb**      | ~10,485,760 bytes |
+
+That’s already **10× more generous** than Express’s default 100kb!
+
+### Change Limits — Three Super-Simple Ways
+
+#### 1. Per content-type (most common)
+
+```js
+app.json({ limit: '100mb' });        // JSON payloads only
+app.urlencoded({ limit: '50mb' });   // Classic HTML forms
+```
+
+#### 2. Global limit (JSON + urlencoded at once)
+
+```js
+app.bodyParser({ limit: '50mb' });
+// Applies 50mb to both JSON and urlencoded bodies
+```
+
+#### 3. File upload limit (multipart/form-data)
+
+```js
+app.multipart({ limit: '500mb' });   // For very large file uploads
+```
+
+You can freely combine them:
+
+```js
+const app = Lieko();
+
+app.json({ limit: '10mb' });         // Small, fast JSON APIs
+app.urlencoded({ limit: '5mb' });
+app.multipart({ limit: '1gb' });     // Allow huge file uploads
+```
+
+### Real-world Example
+
+```js
+const Lieko = require('lieko-express');
+const app = Lieko();
+
+// Accept reasonably large JSON payloads
+app.json({ limit: '25mb' });
+
+// Accept classic forms
+app.urlencoded({ limit: '10mb' });
+
+// Allow big file uploads (photos, videos, etc.)
+app.multipart({ limit: '500mb' });
+
+app.post('/upload', (req, res) => {
+  console.log('JSON body size :', Buffer.byteLength(JSON.stringify(req.body)), 'bytes');
+  console.log('Uploaded files :', Object.keys(req.files || {}));
+
+  res.ok({ received: true, files: req.files });
+});
+
+app.listen(3000);
+```
 
 Uploads end up in:
 
@@ -545,6 +987,12 @@ Query & body fields are **auto converted**:
 "false" → false  
 "null" → null  
 ```
+
+
+**No `app.use(express.json())`, no `app.use(express.urlencoded())`, no extra dependencies** — everything works out of the box, blazing fast, and fully configurable in one line.
+
+That’s the Lieko philosophy: **less boilerplate, more power**.
+
 
 ### Response Methods
 
@@ -1577,6 +2025,7 @@ DEBUG REQUEST
 → Params: {"id":"42"}
 → Query: {"page":2,"active":true}
 → Body: {}
+→ Body Size: 0 bytes
 → Files: 
 ---------------------------------------------
 ```

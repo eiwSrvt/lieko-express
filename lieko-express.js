@@ -422,6 +422,127 @@ class LiekoExpress {
       strictTrailingSlash: true,
       allowTrailingSlash: false,
     };
+
+    this.bodyParserOptions = {
+      json: {
+        limit: '10mb',
+        strict: true
+      },
+      urlencoded: {
+        limit: '10mb',
+        extended: true
+      },
+      multipart: {
+        limit: '10mb'
+      }
+    };
+
+    this.corsOptions = {
+      enabled: false,
+      origin: "*",
+      strictOrigin: false,
+      allowPrivateNetwork: false,
+      methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+      headers: ["Content-Type", "Authorization"],
+      credentials: false,
+      maxAge: 86400,
+      exposedHeaders: [],
+      debug: false
+    };
+  }
+
+  cors(options = {}) {
+    this.corsOptions = {
+      ...this.corsOptions,
+      enabled: true,
+      ...options
+    };
+  }
+
+  _matchOrigin(origin, allowedOrigin) {
+    if (!origin || !allowedOrigin) return false;
+
+    if (Array.isArray(allowedOrigin)) {
+      return allowedOrigin.some(o => this._matchOrigin(origin, o));
+    }
+
+    if (allowedOrigin === "*") return true;
+
+    // Wildcard https://*.example.com
+    if (allowedOrigin.includes("*")) {
+      const regex = new RegExp("^" + allowedOrigin
+        .replace(/\./g, "\\.")
+        .replace(/\*/g, ".*") + "$");
+
+      return regex.test(origin);
+    }
+
+    return origin === allowedOrigin;
+  }
+
+  _applyCors(req, res, opts) {
+    if (!opts || !opts.enabled) return;
+
+    const requestOrigin = req.headers.origin || "";
+
+    let finalOrigin = "*";
+
+    if (opts.strictOrigin && requestOrigin) {
+      const allowed = this._matchOrigin(requestOrigin, opts.origin);
+
+      if (!allowed) {
+        res.statusCode = 403;
+        return res.end(JSON.stringify({
+          success: false,
+          error: "Origin Forbidden",
+          message: `Origin "${requestOrigin}" is not allowed`
+        }));
+      }
+    }
+
+    if (opts.origin === "*") {
+      finalOrigin = "*";
+    } else if (Array.isArray(opts.origin)) {
+      const match = opts.origin.find(o => this._matchOrigin(requestOrigin, o));
+      finalOrigin = match || opts.origin[0];
+    } else {
+      finalOrigin = this._matchOrigin(requestOrigin, opts.origin)
+        ? requestOrigin
+        : opts.origin;
+    }
+
+    this._logCorsDebug(req, {
+      ...opts,
+      origin: finalOrigin
+    });
+
+    res.setHeader("Access-Control-Allow-Origin", finalOrigin);
+
+    if (opts.credentials) {
+      res.setHeader("Access-Control-Allow-Credentials", "true");
+    }
+
+    if (opts.exposedHeaders?.length) {
+      res.setHeader("Access-Control-Expose-Headers",
+        opts.exposedHeaders.join(", "));
+    }
+
+    // Chrome Private Network Access
+    if (
+      opts.allowPrivateNetwork &&
+      req.headers["access-control-request-private-network"] === "true"
+    ) {
+      res.setHeader("Access-Control-Allow-Private-Network", "true");
+    }
+
+    if (req.method === "OPTIONS") {
+      res.setHeader("Access-Control-Allow-Methods", opts.methods.join(", "));
+      res.setHeader("Access-Control-Allow-Headers", opts.headers.join(", "));
+      res.setHeader("Access-Control-Max-Age", opts.maxAge);
+
+      res.statusCode = 204;
+      return res.end();
+    }
   }
 
   set(name, value) {
@@ -449,6 +570,244 @@ class LiekoExpress {
 
   disabled(name) {
     return !this.settings[name];
+  }
+
+  bodyParser(options = {}) {
+    if (options.limit) {
+      this.bodyParserOptions.json.limit = options.limit;
+      this.bodyParserOptions.urlencoded.limit = options.limit;
+    }
+    if (options.extended !== undefined) {
+      this.bodyParserOptions.urlencoded.extended = options.extended;
+    }
+    if (options.strict !== undefined) {
+      this.bodyParserOptions.json.strict = options.strict;
+    }
+    return this;
+  }
+
+  json(options = {}) {
+    if (options.limit) {
+      this.bodyParserOptions.json.limit = options.limit;
+    }
+    if (options.strict !== undefined) {
+      this.bodyParserOptions.json.strict = options.strict;
+    }
+    return this;
+  }
+
+  urlencoded(options = {}) {
+    if (options.limit) {
+      this.bodyParserOptions.urlencoded.limit = options.limit;
+    }
+    if (options.extended !== undefined) {
+      this.bodyParserOptions.urlencoded.extended = options.extended;
+    }
+    return this;
+  }
+
+  multipart(options = {}) {
+    if (options.limit) {
+      this.bodyParserOptions.multipart.limit = options.limit;
+    }
+    return this;
+  }
+
+  _parseLimit(limit) {
+    if (typeof limit === 'number') return limit;
+
+    const match = limit.match(/^(\d+(?:\.\d+)?)(kb|mb|gb)?$/i);
+    if (!match) return 1048576; // 1mb par défaut
+
+    const value = parseFloat(match[1]);
+    const unit = (match[2] || 'b').toLowerCase();
+
+    const multipliers = {
+      b: 1,
+      kb: 1024,
+      mb: 1024 * 1024,
+      gb: 1024 * 1024 * 1024
+    };
+
+    return value * multipliers[unit];
+  }
+
+  async _parseBody(req, routeOptions = null) {
+    return new Promise((resolve, reject) => {
+
+      if (['GET', 'DELETE', 'HEAD'].includes(req.method)) {
+        req.body = {};
+        req.files = {};
+        req._bodySize = 0;
+        return resolve();
+      }
+
+      const contentType = (req.headers['content-type'] || '').toLowerCase();
+      const options = routeOptions || this.bodyParserOptions;
+
+      req.body = {};
+      req.files = {};
+
+      let raw = Buffer.alloc(0);
+      let size = 0;
+      let limitExceeded = false;
+      let errorSent = false;
+
+      const detectLimit = () => {
+        if (contentType.includes('application/json')) {
+          return this._parseLimit(options.json.limit);
+        } else if (contentType.includes('application/x-www-form-urlencoded')) {
+          return this._parseLimit(options.urlencoded.limit);
+        } else if (contentType.includes('multipart/form-data')) {
+          return this._parseLimit(options.multipart.limit);
+        } else {
+          return this._parseLimit('1mb');
+        }
+      };
+
+      const limit = detectLimit();
+      const limitLabel =
+        contentType.includes('application/json') ? options.json.limit :
+          contentType.includes('application/x-www-form-urlencoded') ? options.urlencoded.limit :
+            contentType.includes('multipart/form-data') ? options.multipart.limit :
+              '1mb';
+
+      req.on('data', chunk => {
+        if (limitExceeded || errorSent) return;
+
+        size += chunk.length;
+
+        if (size > limit) {
+          limitExceeded = true;
+          errorSent = true;
+
+          req.removeAllListeners('data');
+          req.removeAllListeners('end');
+          req.removeAllListeners('error');
+
+          req.on('data', () => { });
+          req.on('end', () => { });
+
+          const error = new Error(`Request body too large. Limit: ${limitLabel}`);
+          error.status = 413;
+          error.code = 'PAYLOAD_TOO_LARGE';
+          return reject(error);
+        }
+
+        raw = Buffer.concat([raw, chunk]);
+      });
+
+      req.on('end', () => {
+        if (limitExceeded) return;
+
+        req._bodySize = size;
+
+        try {
+
+          if (contentType.includes('application/json')) {
+            const text = raw.toString();
+            try {
+              req.body = JSON.parse(text);
+
+              if (options.json.strict && text.trim() && !['[', '{'].includes(text.trim()[0])) {
+                return reject(new Error('Strict mode: body must be an object or array'));
+              }
+            } catch (err) {
+              req.body = {};
+            }
+          }
+
+          else if (contentType.includes('application/x-www-form-urlencoded')) {
+            const text = raw.toString();
+            const params = new URLSearchParams(text);
+            req.body = {};
+
+            if (options.urlencoded.extended) {
+              for (const [key, value] of params) {
+                if (key.includes('[')) {
+                  const match = key.match(/^([^\[]+)\[([^\]]*)\]$/);
+                  if (match) {
+                    const [, objKey, subKey] = match;
+                    if (!req.body[objKey]) req.body[objKey] = {};
+                    if (subKey) req.body[objKey][subKey] = value;
+                    else {
+                      if (!Array.isArray(req.body[objKey])) req.body[objKey] = [];
+                      req.body[objKey].push(value);
+                    }
+                    continue;
+                  }
+                }
+                req.body[key] = value;
+              }
+            } else {
+              req.body = Object.fromEntries(params);
+            }
+          }
+
+          else if (contentType.includes('multipart/form-data')) {
+            const boundaryMatch = contentType.match(/boundary=([^;]+)/);
+            if (!boundaryMatch) return reject(new Error('Missing multipart boundary'));
+
+            const boundary = '--' + boundaryMatch[1];
+
+            const text = raw.toString('binary');
+            const parts = text.split(boundary).filter(p => p && !p.includes('--'));
+
+            for (let part of parts) {
+              const headerEnd = part.indexOf('\r\n\r\n');
+              if (headerEnd === -1) continue;
+
+              const headers = part.slice(0, headerEnd);
+              const body = part.slice(headerEnd + 4).replace(/\r\n$/, '');
+
+              const nameMatch = headers.match(/name="([^"]+)"/);
+              const filenameMatch = headers.match(/filename="([^"]*)"/);
+              const contentTypeMatch = headers.match(/Content-Type:\s*([^\r\n]+)/i);
+
+              const field = nameMatch?.[1];
+              if (!field) continue;
+
+              if (filenameMatch?.[1]) {
+                const bin = Buffer.from(body, 'binary');
+
+                req.files[field] = {
+                  filename: filenameMatch[1],
+                  data: bin,
+                  size: bin.length,
+                  contentType: contentTypeMatch ? contentTypeMatch[1] : 'application/octet-stream'
+                };
+              } else {
+                req.body[field] = body;
+              }
+            }
+          }
+
+          else {
+            const text = raw.toString();
+            req.body = text ? { text } : {};
+          }
+
+          for (const key in req.body) {
+            const value = req.body[key];
+
+            if (typeof value === 'string' && value.trim() !== '' && !isNaN(value)) {
+              req.body[key] = parseFloat(value);
+            } else if (value === 'true') {
+              req.body[key] = true;
+            } else if (value === 'false') {
+              req.body[key] = false;
+            }
+          }
+
+          resolve();
+
+        } catch (error) {
+          reject(error);
+        }
+      });
+
+      req.on('error', reject);
+    });
   }
 
   get(path, ...handlers) {
@@ -540,24 +899,21 @@ class LiekoExpress {
   }
 
   _checkMiddleware(handler) {
-    const isAsync = handler.constructor.name === 'AsyncFunction';
+    const isAsync = handler instanceof (async () => { }).constructor;
 
-    if (isAsync) {
-      return;
-    }
+    if (isAsync) return;
 
-    const paramCount = handler.length;
-
-    if (paramCount < 3) {
+    if (handler.length < 3) {
       console.warn(`
-⚠️  WARNING: Synchronous middleware detected without 'next' parameter!
-   This may cause the request to hang indefinitely.
-   
-   Your middleware: ${handler.toString().split('\n')[0].substring(0, 80)}...
-   
-   Fix: Add 'next' as third parameter and call it:
-   ✅ (req, res, next) => { /* your code */ next(); }
-`);
+      ⚠️  WARNING: Middleware executed without a 'next' parameter.
+        This middleware may block the request pipeline.
+
+        Offending middleware:
+        ${handler.toString().split('\n')[0].substring(0, 120)}...
+
+        Fix: Add 'next' as third parameter and call it:
+        (req, res, next) => { /* your code */ next(); }
+      `);
     }
   }
 
@@ -655,7 +1011,8 @@ class LiekoExpress {
         groupChain: [
           ...this.groupStack,
           ...(route.groupChain || [])
-        ]
+        ],
+        bodyParserOptions: router.bodyParserOptions
       });
     });
   }
@@ -772,7 +1129,7 @@ class LiekoExpress {
     }
 
     const HTTP_STATUS = {
-      // 4xx — CLIENT ERRORS
+      // 4xx – CLIENT ERRORS
       INVALID_REQUEST: 400,
       VALIDATION_FAILED: 400,
       NO_TOKEN_PROVIDED: 401,
@@ -784,7 +1141,7 @@ class LiekoExpress {
       RECORD_EXISTS: 409,
       TOO_MANY_REQUESTS: 429,
 
-      // 5xx — SERVER ERRORS
+      // 5xx – SERVER ERRORS
       SERVER_ERROR: 500,
       SERVICE_UNAVAILABLE: 503
     };
@@ -848,43 +1205,89 @@ class LiekoExpress {
 
   async _handleRequest(req, res) {
     this._enhanceRequest(req);
+
     const url = req.url;
-    const questionMarkIndex = url.indexOf('?');
-    const pathname = questionMarkIndex === -1 ? url : url.substring(0, questionMarkIndex);
+    const qIndex = url.indexOf('?');
+    const pathname = qIndex === -1 ? url : url.substring(0, qIndex);
 
     const query = {};
-    if (questionMarkIndex !== -1) {
-      const searchParams = new URLSearchParams(url.substring(questionMarkIndex + 1));
+    if (qIndex !== -1) {
+      const searchParams = new URLSearchParams(url.substring(qIndex + 1));
       for (const [key, value] of searchParams) query[key] = value;
     }
-
     req.query = query;
     req.params = {};
 
     for (const key in req.query) {
-      const value = req.query[key];
-      if (value === 'true') req.query[key] = true;
-      if (value === 'false') req.query[key] = false;
-      if (/^\d+$/.test(value)) req.query[key] = parseInt(value);
-      if (/^\d+\.\d+$/.test(value)) req.query[key] = parseFloat(value);
+      const v = req.query[key];
+      if (v === 'true') req.query[key] = true;
+      else if (v === 'false') req.query[key] = false;
+      else if (/^\d+$/.test(v)) req.query[key] = parseInt(v);
+      else if (/^\d+\.\d+$/.test(v)) req.query[key] = parseFloat(v);
     }
 
-    await this._parseBody(req);
     req._startTime = process.hrtime.bigint();
     this._enhanceResponse(req, res);
 
     try {
+
+      if (req.method === "OPTIONS" && this.corsOptions.enabled) {
+        this._applyCors(req, res, this.corsOptions);
+        return;
+      }
+
+      const route = this._findRoute(req.method, pathname);
+
+      if (route) {
+
+        if (route.cors === false) { }
+
+        else if (route.cors) {
+          const finalCors = {
+            ...this.corsOptions,
+            enabled: true,
+            ...route.cors
+          };
+
+          this._applyCors(req, res, finalCors);
+          if (req.method === "OPTIONS") return;
+        }
+
+        else if (this.corsOptions.enabled) {
+          this._applyCors(req, res, this.corsOptions);
+          if (req.method === "OPTIONS") return;
+        }
+
+      } else {
+
+        if (this.corsOptions.enabled) {
+          this._applyCors(req, res, this.corsOptions);
+          if (req.method === "OPTIONS") return;
+        }
+      }
+
+      try {
+        await this._parseBody(req, route ? route.bodyParserOptions : null);
+      } catch (error) {
+        if (error.code === 'PAYLOAD_TOO_LARGE') {
+          return res.status(413).json({
+            success: false,
+            error: 'Payload Too Large',
+            message: error.message
+          });
+        }
+        return await this._runErrorHandlers(error, req, res);
+      }
+
       for (const mw of this.middlewares) {
         if (res.headersSent) return;
 
-        if (mw.path && !pathname.startsWith(mw.path)) {
-          continue;
-        }
+        if (mw.path && !pathname.startsWith(mw.path)) continue;
 
         await new Promise((resolve, reject) => {
-          const next = async (error) => {
-            if (error) {
-              await this._runErrorHandlers(error, req, res);
+          const next = async (err) => {
+            if (err) {
+              await this._runErrorHandlers(err, req, res);
               return resolve();
             }
             resolve();
@@ -899,14 +1302,9 @@ class LiekoExpress {
 
       if (res.headersSent) return;
 
-      const route = this._findRoute(req.method, pathname);
-
       if (!route) {
-        if (this.notFoundHandler) {
-          return this.notFoundHandler(req, res);
-        } else {
-          return res.status(404).json({ error: 'Route not found' });
-        }
+        if (this.notFoundHandler) return this.notFoundHandler(req, res);
+        return res.status(404).json({ error: 'Route not found' });
       }
 
       req.params = route.params;
@@ -915,9 +1313,9 @@ class LiekoExpress {
         if (res.headersSent) return;
 
         await new Promise((resolve, reject) => {
-          const next = async (error) => {
-            if (error) {
-              await this._runErrorHandlers(error, req, res);
+          const next = async (err) => {
+            if (err) {
+              await this._runErrorHandlers(err, req, res);
               return resolve();
             }
             resolve();
@@ -1175,85 +1573,6 @@ class LiekoExpress {
     };
   }
 
-  async _parseBody(req) {
-    return new Promise((resolve) => {
-      if (['GET', 'DELETE', 'HEAD'].includes(req.method)) {
-        req.body = {};
-        req.files = {};
-        return resolve();
-      }
-
-      const contentType = (req.headers['content-type'] || '').toLowerCase();
-      req.body = {};
-      req.files = {};
-
-      let raw = '';
-      req.on('data', chunk => raw += chunk);
-      req.on('end', () => {
-
-        if (contentType.includes('application/json')) {
-          try {
-            req.body = JSON.parse(raw);
-          } catch {
-            req.body = {};
-          }
-        }
-        else if (contentType.includes('application/x-www-form-urlencoded')) {
-          req.body = Object.fromEntries(new URLSearchParams(raw));
-        }
-        else if (contentType.includes('multipart/form-data')) {
-          const boundaryMatch = contentType.match(/boundary=([^\s;]+)/);
-          if (boundaryMatch) {
-            const boundary = '--' + boundaryMatch[1];
-            const parts = raw.split(boundary).filter(p => p && !p.includes('--'));
-
-            for (let part of parts) {
-              const headerEnd = part.indexOf('\r\n\r\n');
-              if (headerEnd === -1) continue;
-
-              const headers = part.slice(0, headerEnd);
-              const body = part.slice(headerEnd + 4).replace(/\r\n$/, '');
-
-              const nameMatch = headers.match(/name="([^"]+)"/);
-              const filenameMatch = headers.match(/filename="([^"]*)"/);
-              const field = nameMatch?.[1];
-              if (!field) continue;
-
-              if (filenameMatch?.[1]) {
-                req.files[field] = {
-                  filename: filenameMatch[1],
-                  data: Buffer.from(body, 'binary'),
-                  contentType: headers.match(/Content-Type: (.*)/i)?.[1] || 'application/octet-stream'
-                };
-              } else {
-                req.body[field] = body;
-              }
-            }
-          }
-        }
-        else {
-          req.body = raw ? { text: raw } : {};
-        }
-
-        for (const key in req.body) {
-          const value = req.body[key];
-
-          if (typeof value === 'string' && value.trim() !== '' && !isNaN(value) && !isNaN(parseFloat(value))) {
-            req.body[key] = parseFloat(value);
-          }
-          else if (value === 'true') {
-            req.body[key] = true;
-          }
-          else if (value === 'false') {
-            req.body[key] = false;
-          }
-        }
-
-        resolve();
-      });
-    });
-  }
-
   async _runMiddleware(handler, req, res) {
     return new Promise((resolve, reject) => {
       const next = (err) => err ? reject(err) : resolve();
@@ -1286,18 +1605,61 @@ class LiekoExpress {
           code >= 300 ? '\x1b[36m' :
             '\x1b[32m';
 
+    const bodySize = req._bodySize || 0;
+    let bodySizeFormatted;
+
+    if (bodySize === 0) {
+      bodySizeFormatted = '0 bytes';
+    } else if (bodySize < 1024) {
+      bodySizeFormatted = `${bodySize} bytes`;
+    } else if (bodySize < 1024 * 1024) {
+      bodySizeFormatted = `${(bodySize / 1024).toFixed(2)} KB`;
+    } else if (bodySize < 1024 * 1024 * 1024) {
+      bodySizeFormatted = `${(bodySize / (1024 * 1024)).toFixed(2)} MB`;
+    } else {
+      bodySizeFormatted = `${(bodySize / (1024 * 1024 * 1024)).toFixed(2)} GB`;
+    }
+
     console.log(
       `\n🟦 DEBUG REQUEST` +
       `\n→ ${req.method} ${req.originalUrl}` +
       `\n→ IP: ${req.ip.ipv4}` +
       `\n→ Status: ${color(res.statusCode)}${res.statusCode}\x1b[0m` +
       `\n→ Duration: ${timeFormatted}` +
+      `\n→ Body Size: ${bodySizeFormatted}` +
       `\n→ Params: ${JSON.stringify(req.params || {})}` +
       `\n→ Query: ${JSON.stringify(req.query || {})}` +
-      `\n→ Body: ${JSON.stringify(req.body || {})}` +
+      `\n→ Body: ${JSON.stringify(req.body || {}).substring(0, 200)}${JSON.stringify(req.body || {}).length > 200 ? '...' : ''}` +
       `\n→ Files: ${Object.keys(req.files || {}).join(', ')}` +
       `\n---------------------------------------------\n`
     );
+  }
+
+  _logCorsDebug(req, opts) {
+    if (!opts.debug) return;
+
+    console.log("\n[CORS DEBUG]");
+    console.log("Request:", req.method, req.url);
+    console.log("Origin:", req.headers.origin || "none");
+
+    console.log("Applied CORS Policy:");
+    console.log("  - Access-Control-Allow-Origin:", opts.origin);
+    console.log("  - Access-Control-Allow-Methods:", opts.methods.join(", "));
+    console.log("  - Access-Control-Allow-Headers:", opts.headers.join(", "));
+
+    if (opts.credentials) {
+      console.log("  - Access-Control-Allow-Credentials: true");
+    }
+
+    if (opts.exposedHeaders?.length) {
+      console.log("  - Access-Control-Expose-Headers:", opts.exposedHeaders.join(", "));
+    }
+
+    console.log("  - Max-Age:", opts.maxAge);
+
+    if (req.method === "OPTIONS") {
+      console.log("Preflight request handled with status 204\n");
+    }
   }
 
   _buildRouteTree() {

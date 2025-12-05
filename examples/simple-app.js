@@ -38,18 +38,8 @@ app.use((req, res, next) => {
 
     next();
 });
-
-// CORS middleware
-app.use((req, res, next) => {
-    res.set('Access-Control-Allow-Origin', '*');
-    res.set('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, PATCH');
-    res.set('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-
-    if (req.method === 'OPTIONS') {
-        return res.status(200).send('OK');
-    }
-    next();
-});
+app.enable('debug');
+//app.cors({ debug: true });
 
 const authMiddleware = (req, res, next) => {
     const token = req.headers['authorization'];

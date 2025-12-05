@@ -206,8 +206,6 @@ async function runTests() {
       body: JSON.stringify(newUser)
     });
 
-    console.log(response.status, data)
-
     assert(response.status === 201, `POST /api/users return 201 (got ${response.status})`);
     assert(data.success === true, `Création réussie (success=${data.success})`);
     assert(data.data && data.data.username === newUser.username, 'Username correct');

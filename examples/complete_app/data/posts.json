@@ -422,5 +422,21 @@
     "published": false,
     "userId": 1,
     "createdAt": "2025-12-03T22:29:00.810Z"
+  },
+  {
+    "id": 54,
+    "title": "test  test",
+    "content": "test content post",
+    "published": false,
+    "userId": 1,
+    "createdAt": "2025-12-04T21:29:14.790Z"
+  },
+  {
+    "id": 55,
+    "title": "my best post",
+    "content": "another test",
+    "published": false,
+    "userId": 1,
+    "createdAt": "2025-12-05T02:22:50.881Z"
   }
 ]

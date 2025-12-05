@@ -1,7 +1,6 @@
 const Lieko = require('lieko-express');
 const config = require('./config');
 const logger = require('./middleware/logger');
-const cors = require('./middleware/cors');
 const { notFoundHandler, errorHandler } = require('./middleware/errorHandler');
 const mountRoutes = require('./routes');
 
@@ -12,8 +11,13 @@ app.enable('debug');
 app.enable('allowTrailingSlash');
 app.disable('x-powered-by');
 
+// Only for overide default settings json: 1mb, url: 1mb
+//app.json({ limit: '50mb' });
+//app.urlencoded({ limit: '100kb', extended: false });
+//app.multipart({ limit: '50mb' })
+
 app.use(logger);
-app.use(cors);
+app.cors({ debug: true });
 
 mountRoutes(app);
 
