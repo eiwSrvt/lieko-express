@@ -1,5 +1,7 @@
 const { createServer } = require('http');
 const net = require("net");
+const fs = require("fs");
+const path = require("path");
 
 process.env.UV_THREADPOOL_SIZE = require('os').availableParallelism();
 
@@ -420,8 +422,12 @@ class LiekoExpress {
       'x-powered-by': 'lieko-express',
       'trust proxy': false,
       strictTrailingSlash: true,
-      allowTrailingSlash: false,
+      allowTrailingSlash: true,
+      views: path.join(process.cwd(), "views"),
+      "view engine": null
     };
+
+    this.engines = {};
 
     this.bodyParserOptions = {
       json: {
@@ -545,13 +551,23 @@ class LiekoExpress {
     }
   }
 
+  debug(value = true) {
+    if (typeof value === 'string') {
+      value = value.toLowerCase() === 'true';
+    }
+    this.set('debug', value);
+    return this;
+  }
+
   set(name, value) {
     this.settings[name] = value;
     return this;
   }
 
-  get(name) {
-    return this.settings[name];
+  engine(ext, renderFunction) {
+    if (!ext.startsWith(".")) ext = "." + ext;
+    this.engines[ext] = renderFunction;
+    return this;
   }
 
   enable(name) {
@@ -576,6 +592,7 @@ class LiekoExpress {
     if (options.limit) {
       this.bodyParserOptions.json.limit = options.limit;
       this.bodyParserOptions.urlencoded.limit = options.limit;
+      this.bodyParserOptions.multipart.limit = options.limit;
     }
     if (options.extended !== undefined) {
       this.bodyParserOptions.urlencoded.extended = options.extended;
@@ -617,7 +634,7 @@ class LiekoExpress {
     if (typeof limit === 'number') return limit;
 
     const match = limit.match(/^(\d+(?:\.\d+)?)(kb|mb|gb)?$/i);
-    if (!match) return 1048576; // 1mb par défaut
+    if (!match) return 1048576;
 
     const value = parseFloat(match[1]);
     const unit = (match[2] || 'b').toLowerCase();
@@ -810,9 +827,13 @@ class LiekoExpress {
     });
   }
 
-  get(path, ...handlers) {
-    this._addRoute('GET', path, ...handlers);
-    return this;
+  get(...args) {
+    if (args.length === 1 && typeof args[0] === 'string' && !args[0].startsWith('/')) {
+      return this.settings[args[0]];
+    } else {
+      this._addRoute('GET', ...args);
+      return this;
+    }
   }
 
   post(path, ...handlers) {
@@ -867,6 +888,12 @@ class LiekoExpress {
       all(path, ...handlers) { return this._call('all', path, handlers); },
 
       use(pathOrMw, ...rest) {
+        if (typeof pathOrMw === 'object' && pathOrMw instanceof LiekoExpress) {
+          const finalPath = fullBase === '/' ? '/' : fullBase;
+          parent.use(finalPath, ...middlewares, pathOrMw);
+          return subApp;
+        }
+
         if (typeof pathOrMw === "function") {
           parent.use(fullBase, ...middlewares, pathOrMw);
           return subApp;
@@ -904,16 +931,66 @@ class LiekoExpress {
     if (isAsync) return;
 
     if (handler.length < 3) {
+      const funcString = handler.toString();
+      const stack = new Error().stack;
+      let userFileInfo = 'unknown location';
+      let userLine = '';
+
+      if (stack) {
+        const lines = stack.split('\n');
+
+        for (let i = 0; i < lines.length; i++) {
+          const line = lines[i].trim();
+
+          if (line.includes('lieko-express.js') ||
+            line.includes('_checkMiddleware') ||
+            line.includes('at LiekoExpress.') ||
+            line.includes('at Object.<anonymous>') ||
+            line.includes('at Module._compile')) {
+            continue;
+          }
+
+          const fileMatch = line.match(/\(?(.+?):(\d+):(\d+)\)?$/);
+          if (fileMatch) {
+            const filePath = fileMatch[1];
+            const lineNumber = fileMatch[2];
+
+            const shortPath = filePath.replace(process.cwd(), '.');
+            userFileInfo = `${shortPath}:${lineNumber}`;
+            userLine = line;
+            break;
+          }
+        }
+      }
+
+      const firstLine = funcString.split('\n')[0];
+      const secondLine = funcString.split('\n')[1] || '';
+      const thirdLine = funcString.split('\n')[2] || '';
+
+      const yellow = '\x1b[33m';
+      const red = '\x1b[31m';
+      const cyan = '\x1b[36m';
+      const reset = '\x1b[0m';
+      const bold = '\x1b[1m';
+
       console.warn(`
-      ⚠️  WARNING: Middleware executed without a 'next' parameter.
-        This middleware may block the request pipeline.
+${yellow}${bold}⚠️  WARNING: Middleware missing 'next' parameter${reset}
+${yellow}This middleware may block the request pipeline.${reset}
 
-        Offending middleware:
-        ${handler.toString().split('\n')[0].substring(0, 120)}...
+${cyan}📍 Defined at:${reset} ${userFileInfo}
+${userLine ? `${cyan}   Stack trace:${reset} ${userLine}` : ''}
 
-        Fix: Add 'next' as third parameter and call it:
-        (req, res, next) => { /* your code */ next(); }
-      `);
+${cyan}🔧 Middleware definition:${reset}
+${yellow}${firstLine.substring(0, 100)}${firstLine.length > 100 ? '...' : ''}${reset}
+${secondLine ? `${yellow}   ${secondLine.substring(0, 100)}${secondLine.length > 100 ? '...' : ''}${reset}` : ''}
+${thirdLine ? `${yellow}   ${thirdLine.substring(0, 100)}${thirdLine.length > 100 ? '...' : ''}${reset}` : ''}
+
+${red}${bold}FIX:${reset} Add 'next' as third parameter and call it:
+${cyan}    (req, res, next) => { 
+        // your code here
+        next(); // ← Don't forget to call next()
+    }${reset}
+    `);
     }
   }
 
@@ -997,12 +1074,257 @@ class LiekoExpress {
     throw new Error('Invalid use() arguments');
   }
 
+  static(root, options = {}) {
+    const opts = {
+      maxAge: options.maxAge || 0,
+      index: options.index !== undefined ? options.index : 'index.html',
+      dotfiles: options.dotfiles || 'ignore',
+      etag: options.etag !== undefined ? options.etag : true,
+      extensions: options.extensions || false,
+      fallthrough: options.fallthrough !== undefined ? options.fallthrough : true,
+      immutable: options.immutable || false,
+      lastModified: options.lastModified !== undefined ? options.lastModified : true,
+      redirect: options.redirect !== undefined ? options.redirect : true,
+      setHeaders: options.setHeaders || null,
+      cacheControl: options.cacheControl !== undefined ? options.cacheControl : true
+    };
+
+    const mimeTypes = {
+      '.html': 'text/html; charset=utf-8',
+      '.htm': 'text/html; charset=utf-8',
+      '.css': 'text/css; charset=utf-8',
+      '.js': 'application/javascript; charset=utf-8',
+      '.mjs': 'application/javascript; charset=utf-8',
+      '.json': 'application/json; charset=utf-8',
+      '.xml': 'application/xml; charset=utf-8',
+      '.txt': 'text/plain; charset=utf-8',
+      '.md': 'text/markdown; charset=utf-8',
+      '.jpg': 'image/jpeg',
+      '.jpeg': 'image/jpeg',
+      '.png': 'image/png',
+      '.gif': 'image/gif',
+      '.svg': 'image/svg+xml',
+      '.webp': 'image/webp',
+      '.ico': 'image/x-icon',
+      '.bmp': 'image/bmp',
+      '.tiff': 'image/tiff',
+      '.tif': 'image/tiff',
+      '.mp3': 'audio/mpeg',
+      '.wav': 'audio/wav',
+      '.ogg': 'audio/ogg',
+      '.m4a': 'audio/mp4',
+      '.aac': 'audio/aac',
+      '.flac': 'audio/flac',
+      '.mp4': 'video/mp4',
+      '.webm': 'video/webm',
+      '.ogv': 'video/ogg',
+      '.avi': 'video/x-msvideo',
+      '.mov': 'video/quicktime',
+      '.wmv': 'video/x-ms-wmv',
+      '.flv': 'video/x-flv',
+      '.mkv': 'video/x-matroska',
+      '.woff': 'font/woff',
+      '.woff2': 'font/woff2',
+      '.ttf': 'font/ttf',
+      '.otf': 'font/otf',
+      '.eot': 'application/vnd.ms-fontobject',
+      '.zip': 'application/zip',
+      '.rar': 'application/x-rar-compressed',
+      '.tar': 'application/x-tar',
+      '.gz': 'application/gzip',
+      '.7z': 'application/x-7z-compressed',
+      '.pdf': 'application/pdf',
+      '.doc': 'application/msword',
+      '.docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      '.xls': 'application/vnd.ms-excel',
+      '.xlsx': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      '.ppt': 'application/vnd.ms-powerpoint',
+      '.pptx': 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+      '.wasm': 'application/wasm',
+      '.csv': 'text/csv; charset=utf-8'
+    };
+
+    const getMimeType = (filePath) => {
+      const ext = path.extname(filePath).toLowerCase();
+      return mimeTypes[ext] || 'application/octet-stream';
+    };
+
+    const generateETag = (stats) => {
+      const mtime = stats.mtime.getTime().toString(16);
+      const size = stats.size.toString(16);
+      return `W/"${size}-${mtime}"`;
+    };
+
+    return async (req, res, next) => {
+      if (req.method !== 'GET' && req.method !== 'HEAD') {
+        return next();
+      }
+
+      try {
+        let pathname = req.url;
+        const qIndex = pathname.indexOf('?');
+        if (qIndex !== -1) {
+          pathname = pathname.substring(0, qIndex);
+        }
+
+        if (pathname === '') {
+          pathname = '/';
+        }
+
+        try {
+          pathname = decodeURIComponent(pathname);
+        } catch (e) {
+          if (opts.fallthrough) return next();
+          return res.status(400).send('Bad Request');
+        }
+
+        let filePath = pathname === '/' ? root : path.join(root, pathname);
+
+        const resolvedPath = path.resolve(filePath);
+        const resolvedRoot = path.resolve(root);
+
+        if (!resolvedPath.startsWith(resolvedRoot)) {
+          if (opts.fallthrough) return next();
+          return res.status(403).send('Forbidden');
+        }
+
+        let stats;
+        try {
+          stats = await fs.promises.stat(filePath);
+        } catch (err) {
+          if (pathname === '/' && opts.index) {
+            const indexes = Array.isArray(opts.index) ? opts.index : [opts.index];
+            for (const indexFile of indexes) {
+              const indexPath = path.join(root, indexFile);
+              try {
+                stats = await fs.promises.stat(indexPath);
+                if (stats.isFile()) {
+                  filePath = indexPath;
+                  break;
+                }
+              } catch (e) {}
+            }
+          }
+
+          if (!stats && opts.extensions && Array.isArray(opts.extensions)) {
+            let found = false;
+            for (const ext of opts.extensions) {
+              const testPath = filePath + (ext.startsWith('.') ? ext : '.' + ext);
+              try {
+                stats = await fs.promises.stat(testPath);
+                filePath = testPath;
+                found = true;
+                break;
+              } catch (e) {}
+            }
+            if (!found) return next();
+          } else if (!stats) {
+            return next();
+          }
+        }
+
+        if (stats.isDirectory()) {
+          if (opts.redirect && !pathname.endsWith('/')) {
+            const query = qIndex !== -1 ? req.url.substring(qIndex) : '';
+            const redirectUrl = pathname + '/' + query;
+            return res.redirect(redirectUrl, 301);
+          }
+
+          if (opts.index) {
+            const indexes = Array.isArray(opts.index) ? opts.index : [opts.index];
+
+            for (const indexFile of indexes) {
+              const indexPath = path.join(filePath, indexFile);
+              try {
+                const indexStats = await fs.promises.stat(indexPath);
+                if (indexStats.isFile()) {
+                  filePath = indexPath;
+                  stats = indexStats;
+                  break;
+                }
+              } catch (e) {}
+            }
+
+            if (stats.isDirectory()) {
+              if (opts.fallthrough) return next();
+              return res.status(404).send('Not Found');
+            }
+          } else {
+            if (opts.fallthrough) return next();
+            return res.status(404).send('Not Found');
+          }
+        }
+
+        if (opts.etag) {
+          const etag = generateETag(stats);
+          const ifNoneMatch = req.headers['if-none-match'];
+
+          if (ifNoneMatch === etag) {
+            res.statusCode = 304;
+            res.end();
+            return;
+          }
+
+          res.setHeader('ETag', etag);
+        }
+
+        if (opts.lastModified) {
+          const lastModified = stats.mtime.toUTCString();
+          const ifModifiedSince = req.headers['if-modified-since'];
+
+          if (ifModifiedSince === lastModified) {
+            res.statusCode = 304;
+            res.end();
+            return;
+          }
+
+          res.setHeader('Last-Modified', lastModified);
+        }
+
+        if (opts.cacheControl) {
+          let cacheControl = 'public';
+
+          if (opts.maxAge > 0) {
+            cacheControl += `, max-age=${opts.maxAge}`;
+          }
+
+          if (opts.immutable) {
+            cacheControl += ', immutable';
+          }
+
+          res.setHeader('Cache-Control', cacheControl);
+        }
+
+        const mimeType = getMimeType(filePath);
+        res.setHeader('Content-Type', mimeType);
+        res.setHeader('Content-Length', stats.size);
+
+        if (typeof opts.setHeaders === 'function') {
+          opts.setHeaders(res, filePath, stats);
+        }
+
+        if (req.method === 'HEAD') {
+          return res.end();
+        }
+
+        const data = await fs.promises.readFile(filePath);
+        res.end(data);
+        return;
+
+      } catch (error) {
+        console.error('Static middleware error:', error);
+        if (opts.fallthrough) return next();
+        res.status(500).send('Internal Server Error');
+      }
+    };
+  }
+
   _mountRouter(basePath, router) {
     basePath = basePath.endsWith('/') ? basePath.slice(0, -1) : basePath;
     router.groupStack = [...this.groupStack];
 
     router.routes.forEach(route => {
-      const fullPath = route.path === '/' ? basePath : basePath + route.path;
+      const fullPath = route.path === '' ? basePath : basePath + route.path;
 
       this.routes.push({
         ...route,
@@ -1013,6 +1335,13 @@ class LiekoExpress {
           ...(route.groupChain || [])
         ],
         bodyParserOptions: router.bodyParserOptions
+      });
+    });
+
+    router.middlewares.forEach(mw => {
+      this.middlewares.push({
+        path: basePath === '' ? mw.path : (mw.path ? basePath + mw.path : basePath),
+        handler: mw.handler
       });
     });
   }
@@ -1031,30 +1360,60 @@ class LiekoExpress {
       }
     });
 
-    this.routes.push({
-      method,
-      path,
-      handler: finalHandler,
-      middlewares: routeMiddlewares,
-      pattern: this._pathToRegex(path),
-      groupChain: [...this.groupStack]
+    const paths = Array.isArray(path) ? path : [path];
+
+    paths.forEach(original => {
+      let p = String(original).trim();      
+      p = p.replace(/\/+/g, '/');
+
+      if (p !== '/' && p.endsWith('/')) {
+        p = p.slice(0, -1);
+      }
+
+      const exists = this.routes.some(r =>
+        r.method === method &&
+        r.path === p &&
+        r.handler === finalHandler
+      );
+
+      if (exists) return;
+
+      this.routes.push({
+        method,
+        path: p,
+        originalPath: original,
+        handler: finalHandler,
+        handlerName: finalHandler.name || 'anonymous',
+        middlewares: routeMiddlewares,
+        pattern: this._pathToRegex(p),
+        allowTrailingSlash: this.settings.allowTrailingSlash ?? false,
+        groupChain: [...this.groupStack]
+      });
     });
   }
 
   _pathToRegex(path) {
-    let pattern = path
-      .replace(/:(\w+)/g, '(?<$1>[^/]+)')  // params :id
-      .replace(/\*/g, '.*');               // wildcards
+    let p = String(path).trim();
+    p = p.replace(/\/+/g, '/');
 
-    const allowTrailing = this.settings.allowTrailingSlash === true ||
-      this.settings.strictTrailingSlash === false;
+    if (p !== '/' && p.endsWith('/')) {
+      p = p.slice(0, -1);
+    }
 
-    const isStaticRoute = !pattern.includes('(') &&
-      !pattern.includes('*') &&
-      !path.endsWith('/');
+    let pattern = p
+      .replace(/:(\w+)/g, '(?<$1>[^/]+)')
+      .replace(/\*/g, '.*');
 
-    if (allowTrailing && isStaticRoute) {
+    const isStatic = !/[:*]/.test(p) && p !== '/';
+
+    const allowTrailing = this.settings.allowTrailingSlash !== false;
+
+    if (isStatic && allowTrailing) {
       pattern += '/?';
+    }
+
+    if (p === '/') {
+      return /^\/?$/;
     }
 
     return new RegExp(`^${pattern}$`);
@@ -1063,11 +1422,32 @@ class LiekoExpress {
   _findRoute(method, pathname) {
     for (const route of this.routes) {
       if (route.method !== method && route.method !== 'ALL') continue;
+
       const match = pathname.match(route.pattern);
       if (match) {
-        return { ...route, params: match.groups || {} };
+        return { ...route, params: match.groups || {}, matchedPath: pathname };
       }
     }
+
+    if (pathname.endsWith('/') && pathname.length > 1) {
+      const cleanPath = pathname.slice(0, -1);
+      for (const route of this.routes) {
+        if (route.method !== method && route.method !== 'ALL') continue;
+
+        if (route.path === cleanPath && route.allowTrailingSlash !== false) {
+          const match = cleanPath.match(route.pattern);
+          if (match) {
+            return {
+              ...route,
+              params: match.groups || {},
+              matchedPath: cleanPath,
+              wasTrailingSlash: true
+            };
+          }
+        }
+      }
+    }
+
     return null;
   }
 
@@ -1160,15 +1540,21 @@ class LiekoExpress {
 
   _parseIp(rawIp) {
     if (!rawIp) return { raw: null, ipv4: null, ipv6: null };
+    let ip = rawIp.trim();
 
-    let ip = rawIp;
-
-    // Remove IPv6 IPv4-mapped prefix "::ffff:"
-    if (ip.startsWith("::ffff:")) {
-      ip = ip.replace("::ffff:", "");
+    if (ip === '::1') {
+      ip = '127.0.0.1';
     }
 
-    const family = net.isIP(ip); // 0=invalid, 4=IPv4, 6=IPv6
+    if (ip.startsWith('::ffff:')) {
+      ip = ip.slice(7);
+    }
+
+    const family = net.isIP(ip);
+
+    if (family === 0) {
+      return { raw: rawIp, ipv4: null, ipv6: null };
+    }
 
     return {
       raw: rawIp,
@@ -1229,8 +1615,9 @@ class LiekoExpress {
     req._startTime = process.hrtime.bigint();
     this._enhanceResponse(req, res);
 
-    try {
+    req.originalUrl = url;
 
+    try {
       if (req.method === "OPTIONS" && this.corsOptions.enabled) {
         this._applyCors(req, res, this.corsOptions);
         return;
@@ -1239,10 +1626,8 @@ class LiekoExpress {
       const route = this._findRoute(req.method, pathname);
 
       if (route) {
-
-        if (route.cors === false) { }
-
-        else if (route.cors) {
+        if (route.cors === false) {
+        } else if (route.cors) {
           const finalCors = {
             ...this.corsOptions,
             enabled: true,
@@ -1251,15 +1636,11 @@ class LiekoExpress {
 
           this._applyCors(req, res, finalCors);
           if (req.method === "OPTIONS") return;
-        }
-
-        else if (this.corsOptions.enabled) {
+        } else if (this.corsOptions.enabled) {
           this._applyCors(req, res, this.corsOptions);
           if (req.method === "OPTIONS") return;
         }
-
       } else {
-
         if (this.corsOptions.enabled) {
           this._applyCors(req, res, this.corsOptions);
           if (req.method === "OPTIONS") return;
@@ -1282,10 +1663,28 @@ class LiekoExpress {
       for (const mw of this.middlewares) {
         if (res.headersSent) return;
 
-        if (mw.path && !pathname.startsWith(mw.path)) continue;
+        let shouldExecute = false;
+        let pathToStrip = '';
+
+        if (mw.path === null) {
+          shouldExecute = true;
+        } else if (url.startsWith(mw.path)) {
+          shouldExecute = true;
+          pathToStrip = mw.path;
+        }
+
+        if (!shouldExecute) continue;
 
         await new Promise((resolve, reject) => {
+          const currentUrl = req.url;
+
+          if (pathToStrip) {
+            req.url = url.substring(pathToStrip.length) || '/';
+          }
+
           const next = async (err) => {
+            req.url = currentUrl;
+
             if (err) {
               await this._runErrorHandlers(err, req, res);
               return resolve();
@@ -1342,25 +1741,31 @@ class LiekoExpress {
   }
 
   _enhanceRequest(req) {
-    const remoteIp = req.connection.remoteAddress || '';
-
-    req.ips = [remoteIp];
-    let clientIp = remoteIp;
+    req.app = this;
+    let remoteIp = req.connection?.remoteAddress ||
+      req.socket?.remoteAddress ||
+      '';
 
     const forwardedFor = req.headers['x-forwarded-for'];
+    let clientIp = remoteIp;
+    let ipsChain = [remoteIp];
 
     if (forwardedFor) {
-      const proxyChain = forwardedFor.split(',').map(ip => ip.trim());
+      const chain = forwardedFor
+        .split(',')
+        .map(s => s.trim())
+        .filter(Boolean);
 
-      if (this._isTrustedProxy(remoteIp)) {
-        clientIp = proxyChain[0];
-        req.ips = proxyChain;
+      if (chain.length > 0 && this._isTrustedProxy(remoteIp)) {
+        clientIp = chain[0];
+        ipsChain = chain;
       }
     }
 
     req.ip = this._parseIp(clientIp);
-
-    req.protocol = req.headers['x-forwarded-proto'] || 'http';
+    req.ips = ipsChain;
+    req.ip.display = req.ip.ipv4 ?? '127.0.0.1';
+    req.protocol = (req.headers['x-forwarded-proto'] || 'http').split(',')[0].trim();
     req.secure = req.protocol === 'https';
 
     const host = req.headers['host'];
@@ -1378,6 +1783,7 @@ class LiekoExpress {
   }
 
   _enhanceResponse(req, res) {
+    res.app = this;
     res.locals = {};
     let responseSent = false;
     let statusCode = 200;
@@ -1419,11 +1825,20 @@ class LiekoExpress {
     };
 
     const originalSetHeader = res.setHeader.bind(res);
-    res.setHeader = (name, value) => {
+
+    res.setHeader = function (name, value) {
       originalSetHeader(name, value);
-      return res;
+      return this;
     };
-    res.set = res.setHeader;
+
+    res.set = function (name, value) {
+      if (arguments.length === 1 && typeof name === 'object' && name !== null) {
+        Object.entries(name).forEach(([k, v]) => originalSetHeader(k, v));
+      } else {
+        originalSetHeader(name, value);
+      }
+      return this;
+    };
     res.header = res.setHeader;
 
     res.removeHeader = function (name) {
@@ -1435,6 +1850,85 @@ class LiekoExpress {
       res.setHeader("Content-Type", mime);
       return res;
     };
+
+    res.render = async (view, options = {}, callback) => {
+      if (responseSent) return res;
+
+      try {
+        const locals = { ...res.locals, ...options };
+        let viewPath = view;
+        let ext = path.extname(view);
+
+        if (!ext) {
+          ext = this.settings['view engine'];
+          if (!ext) {
+            throw new Error('No default view engine specified. Use app.set("view engine", "ejs") or provide file extension.');
+          }
+          if (!ext.startsWith('.')) ext = '.' + ext;
+          viewPath = view + ext;
+        }
+
+        const viewsDir = this.settings.views || path.join(process.cwd(), 'views');
+        let fullPath = path.join(viewsDir, viewPath);
+
+        let fileExists = false;
+        try {
+          await fs.promises.access(fullPath);
+          fileExists = true;
+        } catch (err) {
+          const htmlPath = fullPath.replace(new RegExp(ext.replace('.', '\\.') + '$'), '.html');
+          try {
+            await fs.promises.access(htmlPath);
+            fullPath = htmlPath;
+            fileExists = true;
+          } catch (err2) {
+            fileExists = false;
+          }
+        }
+
+        if (!fileExists) {
+          const error = new Error(
+            `View "${view}" not found. Tried:\n` +
+            `- ${fullPath}\n` +
+            `- ${fullPath.replace(new RegExp(ext.replace('.', '\\.') + '$'), '.html')}`
+          );
+          error.code = 'ENOENT';
+          if (callback) return callback(error);
+          throw error;
+        }
+
+        const renderEngine = this.engines[ext];
+
+        if (!renderEngine) {
+          throw new Error(`No engine registered for extension "${ext}". Use app.engine("${ext}", renderFunction)`);
+        }
+
+        renderEngine(fullPath, locals, (err, html) => {
+          if (err) {
+            if (callback) return callback(err);
+            throw err;
+          }
+
+          if (callback) {
+            callback(null, html);
+          } else {
+            res.statusCode = statusCode;
+            res.setHeader('Content-Type', 'text/html; charset=utf-8');
+            responseSent = true;
+            statusCode = 200;
+            res.end(html);
+          }
+        });
+
+      } catch (error) {
+        if (callback) {
+          callback(error);
+        } else {
+          throw error;
+        }
+      }
+    };
+
 
     res.json = (data) => {
       if (responseSent) return res;
@@ -1620,19 +2114,35 @@ class LiekoExpress {
       bodySizeFormatted = `${(bodySize / (1024 * 1024 * 1024)).toFixed(2)} GB`;
     }
 
-    console.log(
-      `\n🟦 DEBUG REQUEST` +
-      `\n→ ${req.method} ${req.originalUrl}` +
-      `\n→ IP: ${req.ip.ipv4}` +
-      `\n→ Status: ${color(res.statusCode)}${res.statusCode}\x1b[0m` +
-      `\n→ Duration: ${timeFormatted}` +
-      `\n→ Body Size: ${bodySizeFormatted}` +
-      `\n→ Params: ${JSON.stringify(req.params || {})}` +
-      `\n→ Query: ${JSON.stringify(req.query || {})}` +
-      `\n→ Body: ${JSON.stringify(req.body || {}).substring(0, 200)}${JSON.stringify(req.body || {}).length > 200 ? '...' : ''}` +
-      `\n→ Files: ${Object.keys(req.files || {}).join(', ')}` +
-      `\n---------------------------------------------\n`
-    );
+    const logLines = [
+      '[DEBUG REQUEST]',
+      `→ ${req.method} ${req.originalUrl}`,
+      `→ IP: ${req.ip.ipv4 || '127.0.0.1'}`,
+      `→ Status: ${color(res.statusCode)}${res.statusCode}\x1b[0m`,
+      `→ Duration: ${timeFormatted}`,
+    ];
+
+    if (req.params && Object.keys(req.params).length > 0) {
+      logLines.push(`→ Params: ${JSON.stringify(req.params)}`);
+    }
+
+    if (req.query && Object.keys(req.query).length > 0) {
+      logLines.push(`→ Query: ${JSON.stringify(req.query)}`);
+    }
+
+    if (req.body && Object.keys(req.body).length > 0) {
+      const bodyStr = JSON.stringify(req.body);
+      const truncated = bodyStr.substring(0, 200) + (bodyStr.length > 200 ? '...' : '');
+      logLines.push(`→ Body: ${truncated}`);
+      logLines.push(`→ Body Size: ${bodySizeFormatted}`);
+    }
+
+    if (req.files && Object.keys(req.files).length > 0) {
+      logLines.push(`→ Files: ${Object.keys(req.files).join(', ')}`);
+    }
+
+    logLines.push('---------------------------------------------');
+    console.log('\n' + logLines.join('\n') + '\n');
   }
 
   _logCorsDebug(req, opts) {
@@ -1662,84 +2172,76 @@ class LiekoExpress {
     }
   }
 
-  _buildRouteTree() {
-    const tree = {};
-
-    for (const route of this.routes) {
-      let node = tree;
-
-      for (const group of route.groupChain) {
-        const key = group.basePath;
-
-        if (!node[key]) {
-          node[key] = {
-            __meta: group,
-            __children: {},
-            __routes: []
-          };
-        }
-
-        node = node[key].__children;
-      }
-
-      if (!node.__routes) node.__routes = [];
-      node.__routes.push(route);
-    }
-
-    return tree;
-  }
-
   listRoutes() {
-    return this.routes.map(route => ({
-      method: route.method,
-      path: route.path,
-      middlewares: route.middlewares.length
+    const routeEntries = [];
+
+    this.routes.forEach(route => {
+      const existing = routeEntries.find(
+        entry => entry.method === route.method &&
+          entry.handler === route.handler
+      );
+
+      if (existing) {
+        if (!Array.isArray(existing.path)) {
+          existing.path = [existing.path];
+        }
+        existing.path.push(route.path);
+      } else {
+        routeEntries.push({
+          method: route.method,
+          path: route.path,
+          middlewares: route.middlewares.length,
+          handler: route.handler
+        });
+      }
+    });
+
+    return routeEntries.map(entry => ({
+      method: entry.method,
+      path: entry.path,
+      middlewares: entry.middlewares
     }));
   }
 
   printRoutes() {
-    console.log('\n📌 Registered Routes:\n');
+    if (this.routes.length === 0) {
+      console.log('\nNo routes registered.\n');
+      return;
+    }
 
-    this.routes.forEach(r => {
-      console.log(
-        `${r.method.padEnd(6)}  ${r.path}  ` +
-        `(mw: ${r.middlewares.length})`
-      );
+    console.log(`\nRegistered Routes: ${this.routes.length}\n`);
+
+    const grouped = new Map();
+
+    for (const route of this.routes) {
+      const key = `${route.method}|${route.handler}`;
+      if (!grouped.has(key)) {
+        grouped.set(key, {
+          method: route.method,
+          paths: [],
+          mw: route.middlewares.length
+        });
+      }
+      const entry = grouped.get(key);
+      const p = route.path || '/';
+      if (!entry.paths.includes(p)) {
+        entry.paths.push(p);
+      }
+    }
+
+    const sorted = Array.from(grouped.values()).sort((a, b) => {
+      if (a.method !== b.method) return a.method.localeCompare(b.method);
+      return a.paths[0].localeCompare(b.paths[0]);
     });
 
-    console.log('');
-  }
+    for (const r of sorted) {
+      const pathStr = r.paths.length === 1
+        ? r.paths[0]
+        : r.paths.join(', ');
 
-  printRoutesNested(tree = null, indent = '') {
-    if (!tree) {
-      console.log('\n📌 Nested Routes:\n');
-      tree = this._buildRouteTree();
-    }
-
-    const prefix = indent + '  ';
-
-    for (const [path, data] of Object.entries(tree)) {
-      if (path.startsWith("__")) continue;
-
-      const mwCount = data.__meta.middlewares.length;
-      console.log(`${indent}${path}   [${mwCount} mw]`);
-
-      if (data.__routes && data.__routes.length) {
-        for (const route of data.__routes) {
-          const shortPath = route.path.replace(path, '') || '/';
-          console.log(`${prefix}${route.method.padEnd(6)} ${shortPath}`);
-        }
-      }
-      this.printRoutesNested(data.__children, prefix);
-    }
-
-    if (tree.__routes) {
-      for (const route of tree.__routes) {
-        console.log(`${indent}${route.method.padEnd(6)} ${route.path}`);
-      }
+      console.log(` \x1b[36m${r.method.padEnd(7)}\x1b[0m \x1b[33m${pathStr}\x1b[0m \x1b[90m(mw: ${r.mw})\x1b[0m`);
     }
   }
-
   listen() {
     const args = Array.from(arguments);
     const server = createServer(this._handleRequest.bind(this));
@@ -1766,3 +2268,7 @@ module.exports.validators = validators;
 module.exports.validate = validate;
 module.exports.validatePartial = validatePartial;
 module.exports.ValidationError = ValidationError;
+module.exports.static = function (root, options) {
+  const app = new LiekoExpress();
+  return app.static(root, options);
+};

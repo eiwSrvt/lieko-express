@@ -35,6 +35,8 @@ declare namespace Lieko {
 
     // headers helpers
     setHeader(name: string, value: string | number): void;
+    set(name: string | Record<string, string | number>, value?: string | number): void;
+    header(name: string, value: string | number): void;
     getHeader(name: string): string | number | string[] | undefined;
     removeHeader(name: string): void;
     headersSent?: boolean;
@@ -69,20 +71,22 @@ declare namespace Lieko {
   interface Response extends ResponseBase {
     // Rich helpers provided by Lieko
     ok(data?: any, message?: string): void;
+    success: (data?: any, message?: string) => void;
     created(data?: any, message?: string): void;
-    accepted(data?: any, message?: string): void;
     noContent(): void;
+    accepted(data?: any, message?: string): void;
 
     badRequest(message?: string, details?: any): void;
     unauthorized(message?: string, details?: any): void;
     forbidden(message?: string, details?: any): void;
     notFound(message?: string, details?: any): void;
     error(message?: string, status?: number, details?: any): void;
+    fail: (message?: string, status?: number, details?: any) => void;
+    serverError(message?: string, details?: any): void;
 
     // convenience helpers sometimes provided
-    paginated?(items: any[], meta: any): void;
-    file?(pathOrBuffer: string | Buffer, filename?: string): void;
-    download?(path: string, filename?: string): void;
+    paginated?(items: any[], total: number, message?: string): void;
+    html?(html: string, status?: number): void;
 
     // short alias
     statusCode?: number;
@@ -132,35 +136,57 @@ declare namespace Lieko {
 
   // -------------- Validation / Schema (loose typing to match runtime) --------------
   // The framework has a validation system — keep it flexible (user can extend)
-  type ValidatorFn = (value: any) => boolean | string | Promise<boolean | string>;
+  type ValidatorFn = (value: any, field: string, data: any) => { field: string; message: string; type: string } | null;
 
-  interface SchemaField {
-    type?: string | string[]; // "string", "number", etc.
-    required?: boolean;
-    validators?: ValidatorFn[];
-    default?: any;
-    // additional user metadata allowed
-    [key: string]: any;
+  interface Validators {
+    required(message?: string): ValidatorFn;
+    requiredTrue(message?: string): ValidatorFn;
+    optional(): ValidatorFn;
+    string(message?: string): ValidatorFn;
+    number(message?: string): ValidatorFn;
+    boolean(message?: string): ValidatorFn;
+    integer(message?: string): ValidatorFn;
+    positive(message?: string): ValidatorFn;
+    negative(message?: string): ValidatorFn;
+    email(message?: string): ValidatorFn;
+    min(minValue: number, message?: string): ValidatorFn;
+    max(maxValue: number, message?: string): ValidatorFn;
+    length(n: number, message?: string): ValidatorFn;
+    minLength(minLength: number, message?: string): ValidatorFn;
+    maxLength(maxLength: number, message?: string): ValidatorFn;
+    pattern(regex: RegExp, message?: string): ValidatorFn;
+    oneOf(allowedValues: any[], message?: string): ValidatorFn;
+    notOneOf(values: any[], message?: string): ValidatorFn;
+    custom(validatorFn: (value: any, data: any) => boolean, message?: string): ValidatorFn;
+    equal(expectedValue: any, message?: string): ValidatorFn;
+    mustBeTrue(message?: string): ValidatorFn;
+    mustBeFalse(message?: string): ValidatorFn;
+    date(message?: string): ValidatorFn;
+    before(limit: string | Date, message?: string): ValidatorFn;
+    after(limit: string | Date, message?: string): ValidatorFn;
+    startsWith(prefix: string, message?: string): ValidatorFn;
+    endsWith(suffix: string, message?: string): ValidatorFn;
   }
 
-  interface SchemaDefinition {
-    [field: string]: SchemaField | string; // string shorthand for type
+  class Schema {
+    constructor(rules: Record<string, ValidatorFn[]>);
+    rules: Record<string, ValidatorFn[]>;
+    fields: Record<string, ValidatorFn[]>;
+    validate(data: Record<string, any>): true | never;
   }
 
-  interface Schema {
-    definition: SchemaDefinition;
-    validate(obj: any, options?: { partial?: boolean }): { valid: boolean; errors?: any };
-  }
+  function validate(schema: Schema): Handler;
+
+  function validatePartial(schema: Schema): Handler;
 
   // -------------- Routes / Options --------------
-  interface RouteOptions {
-    cors?: Partial<CorsOptions>;
-    bodyParserOptions?: Partial<BodyParserOptions>;
-    middlewares?: Handler[];
-    // validation
-    schema?: Schema | SchemaDefinition;
-    // other custom per-route options
-    [key: string]: any;
+  interface Route {
+    method: string;
+    path: string;
+    handler: Handler;
+    middlewares: Handler[];
+    pattern: RegExp;
+    groupChain: any[];
   }
 
   // -------------- App interface --------------
@@ -168,77 +194,71 @@ declare namespace Lieko {
     // route methods (typed path param extraction)
     get<Path extends string, Q = any, B = any>(
       path: Path,
-      optionsOrHandler?: RouteOptions | Handler<ExtractRouteParams<Path>, Q, B>,
-      maybeHandler?: Handler<ExtractRouteParams<Path>, Q, B>
+      ...handlers: Handler<ExtractRouteParams<Path>, Q, B>[]
     ): this;
 
     post<Path extends string, Q = any, B = any>(
       path: Path,
-      optionsOrHandler?: RouteOptions | Handler<ExtractRouteParams<Path>, Q, B>,
-      maybeHandler?: Handler<ExtractRouteParams<Path>, Q, B>
+      ...handlers: Handler<ExtractRouteParams<Path>, Q, B>[]
     ): this;
 
     put<Path extends string, Q = any, B = any>(
       path: Path,
-      optionsOrHandler?: RouteOptions | Handler<ExtractRouteParams<Path>, Q, B>,
-      maybeHandler?: Handler<ExtractRouteParams<Path>, Q, B>
+      ...handlers: Handler<ExtractRouteParams<Path>, Q, B>[]
     ): this;
 
     patch<Path extends string, Q = any, B = any>(
       path: Path,
-      optionsOrHandler?: RouteOptions | Handler<ExtractRouteParams<Path>, Q, B>,
-      maybeHandler?: Handler<ExtractRouteParams<Path>, Q, B>
+      ...handlers: Handler<ExtractRouteParams<Path>, Q, B>[]
     ): this;
 
     delete<Path extends string, Q = any, B = any>(
       path: Path,
-      optionsOrHandler?: RouteOptions | Handler<ExtractRouteParams<Path>, Q, B>,
-      maybeHandler?: Handler<ExtractRouteParams<Path>, Q, B>
+      ...handlers: Handler<ExtractRouteParams<Path>, Q, B>[]
     ): this;
 
-    options<Path extends string, Q = any, B = any>(
+    all<Path extends string, Q = any, B = any>(
       path: Path,
-      optionsOrHandler?: RouteOptions | Handler<ExtractRouteParams<Path>, Q, B>,
-      maybeHandler?: Handler<ExtractRouteParams<Path>, Q, B>
+      ...handlers: Handler<ExtractRouteParams<Path>, Q, B>[]
     ): this;
-
-    head<Path extends string, Q = any, B = any>(
-      path: Path,
-      optionsOrHandler?: RouteOptions | Handler<ExtractRouteParams<Path>, Q, B>,
-      maybeHandler?: Handler<ExtractRouteParams<Path>, Q, B>
-    ): this;
-
-    // manual route API
-    route(method: string, path: string, options: RouteOptions, handler: Handler): this;
 
     // middleware
-    use(handler: Handler): this;
-    use(path: string, handler: Handler): this;
+    use(handler: Handler | App): this;
+    use(path: string, handler: Handler | App): this;
 
     // grouping
-    group(prefix: string, cb: (router: App) => void): this;
+    group(basePath: string, callback: (group: App) => void): this;
 
     // CORS
-    cors(options?: Partial<CorsOptions>): this;
+    cors(options?: Partial<CorsOptions>): Handler;
 
-    // body parser options at app-level
-    bodyParser(options: Partial<BodyParserOptions>): this;
+    // body parser
+    bodyParser: {
+      json(options?: JsonBodyOptions): Handler;
+      urlencoded(options?: UrlencodedOptions): Handler;
+      multipart(options?: MultipartOptions): Handler;
+    };
 
-    // validation / schema helpers
-    schema(name: string, definition: SchemaDefinition | Schema): Schema;
-    validate(schemaOrDef: string | Schema | SchemaDefinition): Handler;
+    // static files
+    static(root: string, options?: { maxAge?: number; index?: string }): Handler;
 
-    // error / notFound handlers
-    notFound(handler: Handler): this;
-    error(handler: (err: any, req: Request, res: Response) => any): this;
+    // error handler
+    error(res: Response, obj: any): void;
+
+    // settings
+    set(key: string, value: any): this;
+    get(key: string): any;
+
+    // debug
+    debug(value?: boolean | string): this;
 
     // utilities
+    listRoutes(): { method: string; path: string | string[]; middlewares: number }[];
     printRoutes(): void;
-    close(): Promise<void> | void;
 
     // server control
-    listen(port: number, callback?: () => void): any;
-    listen(port: number, host: string, callback?: () => void): any;
+    listen(port: number, host?: string, callback?: () => void): any;
+    listen(...args: any[]): any;
   }
 
   // -------------- Factory / Constructor --------------
@@ -247,6 +267,9 @@ declare namespace Lieko {
     cors?: Partial<CorsOptions>;
     bodyParser?: Partial<BodyParserOptions>;
     trustProxy?: boolean | string | string[];
+    debug?: boolean;
+    allowTrailingSlash?: boolean;
+    strictTrailingSlash?: boolean;
     // other global options
     [key: string]: any;
   }
@@ -255,10 +278,16 @@ declare namespace Lieko {
     (opts?: ConstructorOptions): App;
 
     // expose helpers statically if present in runtime
-    createApp(opts?: ConstructorOptions): App;
+    Router: () => App;
+    Schema: typeof Schema;
+    schema: (...args: any[]) => Schema;
+    validators: Validators;
+    validate: typeof validate;
+    validatePartial: (schema: Schema) => Handler;
+    ValidationError: typeof ValidationError;
+    static: (root: string, options?: { maxAge?: number; index?: string }) => Handler;
   }
 }
 
-// Export as CommonJS-compatible factory function
 declare const Lieko: Lieko.LiekoStatic;
 export = Lieko;
