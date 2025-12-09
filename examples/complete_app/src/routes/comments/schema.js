@@ -1,6 +1,6 @@
-const { schema, validators, validatePartial } = require('lieko-express');
+const { createSchema, validators, validatePartial } = require('lieko-express');
 
-const createCommentSchema = schema({
+const createCommentSchema = createSchema({
   postId: [
     validators.required(),
     validators.number(),

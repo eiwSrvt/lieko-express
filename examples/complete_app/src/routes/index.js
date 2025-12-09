@@ -10,7 +10,9 @@ const sseRoutes = require('./others/sse');
 
 module.exports = (app) => {
 
-  app.get('/', (req, res) => res.ok({ message: 'Lieko Express API Example v1' }));
+  app.get('/', (req, res) => res.render("dashboard", { title: "Lieko Admin Demo" }));
+
+
   app.get('/ping', (req, res) => res.send('pong'));
   app.get('/health', (req, res) => res.ok({ status: 'ok', uptime: process.uptime() }));
 

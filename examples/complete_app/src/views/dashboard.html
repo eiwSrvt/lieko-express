@@ -4,7 +4,7 @@
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
-    <title>Lieko Admin Demo — Clean Dashboard</title>
+    <title>{{ title }}</title>
 
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -41,7 +41,7 @@
     <div class="max-w-7xl mx-auto p-8">
         <header class="flex items-center justify-between mb-8">
             <div>
-                <h1 class="text-3xl font-bold">Lieko Admin Demo</h1>
+                <h1 class="text-3xl font-bold">{{ title }}</h1>
                 <p class="text-gray-600 mt-1">Posts · Users · Comments · clean demo for Lieko-Express</p>
             </div>
 
@@ -381,7 +381,7 @@
         async function publishPost(id) {
             try {
                 const { status } = await fetchJson(`${API}/posts/${id}/publish`, { method: 'PATCH', headers: adminHeaders() });
-                if (status === 200) {
+                if (status === 200 || status === 201) {
                     showToast('Post published', 'success');
                     loadPosts();
                     pushActivity('Published post #' + id);
@@ -437,7 +437,7 @@ ${escapeHtml(post.content || '')}
                     body: JSON.stringify(payload)
                 });
 
-                if (status === 200) {
+                if (status === 200 || status === 201) {
                     showToast('Post updated', 'success');
                     closeModal();
                     loadPosts();
@@ -546,7 +546,7 @@ ${escapeHtml(post.content || '')}
                     body: JSON.stringify(payload)
                 });
 
-                if (status === 200) {
+                if (status === 200 || status === 201) {
                     showToast('User updated', 'success');
                     loadUsers();
                     closeModal();
@@ -564,7 +564,7 @@ ${escapeHtml(post.content || '')}
                     headers: adminHeaders()
                 });
 
-                if (status === 200) {
+                if (status === 200 || status === 201) {
                     showToast('User deleted', 'success');
                     loadUsers();
                     closeModal();
@@ -645,7 +645,7 @@ ${escapeHtml(post.content || '')}
 
         async function approveComment(id) {
             const { status } = await fetchJson(`${API}/comments/${id}/approve`, { method: 'PATCH', headers: adminHeaders() });
-            if (status === 200) {
+            if (status === 200 || status === 201) {
                 showToast('Comment approved', 'success');
                 loadComments();
                 pushActivity('Approved comment #' + id);
@@ -653,21 +653,29 @@ ${escapeHtml(post.content || '')}
         }
 
         async function deleteComment(id) {
-            if (!confirm('Delete comment?')) return;
+            if (!confirm('Are you sure you want to delete this comment?')) {
+                return;
+            }
+
             try {
-                const { status } = await fetchJson(`${API}/comments/${id}`, { method: 'DELETE', headers: adminHeaders() });
+                const { status, message, error } = await fetchJson(`${API}/comments/${id}`, {
+                    method: 'DELETE',
+                    headers: adminHeaders()
+                });
+
                 if (status === 200) {
-                    showToast('Comment deleted', 'success');
-                    loadComments();
-                    pushActivity('Deleted comment #' + id);
+                    showToast('Comment deleted successfully', 'success');
+                    loadComments(commentsPage);
+                    pushActivity(`Deleted comment #${id}`);
                 } else {
-                    showToast('Delete failed (not implemented)', 'error');
+                    const errorMsg = error?.message || message || 'Failed to delete comment';
+                    showToast(errorMsg, 'error');
                 }
             } catch (err) {
-                showToast('Delete failed (network)', 'error');
+                console.error('Delete comment error:', err);
+                showToast('Network error while deleting comment', 'error');
             }
         }
-
 
         function openCreateMenu() {
             openModal('Create new', `
@@ -734,7 +742,7 @@ ${escapeHtml(post.content || '')}
                 if (!age || age <= 0) return showToast('Invalid age', 'error');
                 const payload = { username, email, age, active };
                 const { status, data, error, message } = await fetchJson(`${API}/users`, { method: 'POST', headers: adminHeaders(), body: JSON.stringify(payload) });
-                if (status === 200) {
+                if (status === 200 || status === 201) {
                     showToast('User created', 'success');
                     closeModal();
                     loadUsers();

@@ -1,12 +1,12 @@
 {
   "name": "lieko-express",
-  "version": "0.0.6",
+  "version": "0.0.8",
   "repository": {
     "type": "git",
     "url": "https://github.com/eiwSrvt/lieko-express"
   },
   "homepage": "https://github.com/eiwSrvt/lieko-express",
-  "description": "Lieko-express — A Modern, Minimal, REST API Framework for Node.js",
+  "description": "Lieko-express — A Modern, Minimal, express-like Framework for Node.js",
   "main": "lieko-express.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"

@@ -6,6 +6,6 @@
     "dev": "nodemon src/server.js"
   },
   "dependencies": {
-    "lieko-express": "0.0.6"
+    "lieko-express": "0.0.8"
   }
 }

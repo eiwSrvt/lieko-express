@@ -3,410 +3,15 @@ const net = require("net");
 const fs = require("fs");
 const path = require("path");
 
+const {
+  Schema,
+  ValidationError,
+  validators,
+  validate,
+  validatePartial
+} = require('./lib/schema');
+
 process.env.UV_THREADPOOL_SIZE = require('os').availableParallelism();
-
-class ValidationError extends Error {
-  constructor(errors) {
-    super('Validation failed');
-    this.name = 'ValidationError';
-    this.errors = errors;
-  }
-}
-
-class Schema {
-  constructor(rules) {
-    this.rules = rules;
-    this.fields = rules;
-  }
-
-  validate(data) {
-    const errors = [];
-    for (const [field, validators] of Object.entries(this.rules)) {
-      const value = data[field];
-      for (const validator of validators) {
-        const error = validator(value, field, data);
-        if (error) {
-          errors.push(error);
-          break;
-        }
-      }
-    }
-    if (errors.length > 0) throw new ValidationError(errors);
-    return true;
-  }
-}
-
-const validators = {
-  required: (message = 'Field is required') => {
-    return (value, field) => {
-      if (value === undefined || value === null || value === '') {
-        return { field, message, type: 'required' };
-      }
-      return null;
-    };
-  },
-
-  requiredTrue: (message = 'Field must be true') => {
-    return (value, field) => {
-      const normalized = value === true || value === 'true' || value === '1' || value === 1;
-      if (!normalized) {
-        return { field, message, type: 'requiredTrue' };
-      }
-      return null;
-    }
-  },
-
-  optional: () => {
-    return () => null;
-  },
-
-  string: (message = 'Field must be a string') => {
-    return (value, field) => {
-      if (value !== undefined && typeof value !== 'string') {
-        return { field, message, type: 'string' };
-      }
-      return null;
-    };
-  },
-
-  number: (message = 'Field must be a number') => {
-    return (value, field) => {
-      if (value !== undefined && typeof value !== 'number') {
-        return { field, message, type: 'number' };
-      }
-      return null;
-    };
-  },
-
-  boolean: (message = 'Field must be a boolean') => {
-    return (value, field) => {
-      if (value === undefined || value === null || value === '') return null;
-
-      const validTrue = ['true', true, 1, '1'];
-      const validFalse = ['false', false, 0, '0'];
-
-      const isValid = validTrue.includes(value) || validFalse.includes(value);
-
-      if (!isValid) {
-        return { field, message, type: 'boolean' };
-      }
-
-      return null;
-    };
-  },
-
-  integer: (message = 'Field must be an integer') => {
-    return (value, field) => {
-      if (value !== undefined && !Number.isInteger(value)) {
-        return { field, message, type: 'integer' };
-      }
-      return null;
-    };
-  },
-
-  positive: (message = 'Field must be positive') => {
-    return (value, field) => {
-      if (value !== undefined && value <= 0) {
-        return { field, message, type: 'positive' };
-      }
-      return null;
-    };
-  },
-
-  negative: (message = 'Field must be negative') => {
-    return (value, field) => {
-      if (value !== undefined && value >= 0) {
-        return { field, message, type: 'negative' };
-      }
-      return null;
-    };
-  },
-
-  email: (message = 'Invalid email format') => {
-    return (value, field) => {
-      if (value !== undefined && value !== null) {
-        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-        if (!emailRegex.test(value)) {
-          return { field, message, type: 'email' };
-        }
-      }
-      return null;
-    };
-  },
-
-  min: (minValue, message) => {
-    return (value, field) => {
-      if (value !== undefined && value !== null) {
-        if (typeof value === 'string' && value.length < minValue) {
-          return {
-            field,
-            message: message || `Field must be at least ${minValue} characters`,
-            type: 'min'
-          };
-        }
-        if (typeof value === 'number' && value < minValue) {
-          return {
-            field,
-            message: message || `Field must be at least ${minValue}`,
-            type: 'min'
-          };
-        }
-      }
-      return null;
-    };
-  },
-
-  max: (maxValue, message) => {
-    return (value, field) => {
-      if (value !== undefined && value !== null) {
-        if (typeof value === 'string' && value.length > maxValue) {
-          return {
-            field,
-            message: message || `Field must be at most ${maxValue} characters`,
-            type: 'max'
-          };
-        }
-        if (typeof value === 'number' && value > maxValue) {
-          return {
-            field,
-            message: message || `Field must be at most ${maxValue}`,
-            type: 'max'
-          };
-        }
-      }
-      return null;
-    };
-  },
-
-  length: (n, message) => {
-    return (value, field) => {
-      if (typeof value === 'string' && value.length !== n) {
-        return {
-          field,
-          message: message || `Field must be exactly ${n} characters`,
-          type: 'length'
-        };
-      }
-      return null;
-    };
-  },
-
-  minLength: (minLength, message) => {
-    return (value, field) => {
-      if (value !== undefined && value !== null && typeof value === 'string') {
-        if (value.length < minLength) {
-          return {
-            field,
-            message: message || `Field must be at least ${minLength} characters`,
-            type: 'minLength'
-          };
-        }
-      }
-      return null;
-    };
-  },
-
-  maxLength: (maxLength, message) => {
-    return (value, field) => {
-      if (value !== undefined && value !== null && typeof value === 'string') {
-        if (value.length > maxLength) {
-          return {
-            field,
-            message: message || `Field must be at most ${maxLength} characters`,
-            type: 'maxLength'
-          };
-        }
-      }
-      return null;
-    };
-  },
-
-  pattern: (regex, message = 'Invalid format') => {
-    return (value, field) => {
-      if (value !== undefined && value !== null && typeof value === 'string') {
-        if (!regex.test(value)) {
-          return { field, message, type: 'pattern' };
-        }
-      }
-      return null;
-    };
-  },
-
-  oneOf: (allowedValues, message) => {
-    return (value, field) => {
-      if (value !== undefined && value !== null) {
-        if (!allowedValues.includes(value)) {
-          return {
-            field,
-            message: message || `Field must be one of: ${allowedValues.join(', ')}`,
-            type: 'oneOf'
-          };
-        }
-      }
-      return null;
-    };
-  },
-
-  notOneOf: (values, message) => {
-    return (value, field) => {
-      if (values.includes(value)) {
-        return {
-          field,
-          message: message || `Field cannot be one of: ${values.join(', ')}`,
-          type: 'notOneOf'
-        };
-      }
-      return null;
-    };
-  },
-
-  custom: (validatorFn, message = 'Validation failed') => {
-    return (value, field, data) => {
-      const isValid = validatorFn(value, data);
-      if (!isValid) {
-        return { field, message, type: 'custom' };
-      }
-      return null;
-    };
-  },
-
-  equal: (expectedValue, message) => {
-    return (value, field) => {
-      if (value !== expectedValue) {
-        return {
-          field,
-          message: message || `Field must be equal to ${expectedValue}`,
-          type: 'equal'
-        };
-      }
-      return null;
-    };
-  },
-
-  mustBeTrue: (message = 'This field must be accepted') => {
-    return (value, field) => {
-      const normalized = value === true || value === 'true' || value === '1' || value === 1;
-      if (!normalized) {
-        return { field, message, type: 'mustBeTrue' };
-      }
-      return null;
-    };
-  },
-
-  mustBeFalse: (message = 'This field must be declined') => {
-    return (value, field) => {
-      const normalized = value === false || value === 'false' || value === '0' || value === 0;
-      if (!normalized) {
-        return { field, message, type: 'mustBeFalse' };
-      }
-      return null;
-    };
-  },
-
-  date: (message = 'Invalid date') => {
-    return (value, field) => {
-      if (!value) return null;
-      const date = new Date(value);
-      if (isNaN(date.getTime())) {
-        return { field, message, type: 'date' };
-      }
-      return null;
-    };
-  },
-
-  before: (limit, message) => {
-    return (value, field) => {
-      if (!value) return null;
-      const d1 = new Date(value);
-      const d2 = new Date(limit);
-      if (isNaN(d1) || d1 >= d2) {
-        return {
-          field,
-          message: message || `Date must be before ${limit}`,
-          type: 'before'
-        };
-      }
-      return null;
-    };
-  },
-
-  after: (limit, message) => {
-    return (value, field) => {
-      if (!value) return null;
-      const d1 = new Date(value);
-      const d2 = new Date(limit);
-      if (isNaN(d1) || d1 <= d2) {
-        return {
-          field,
-          message: message || `Date must be after ${limit}`,
-          type: 'after'
-        };
-      }
-      return null;
-    };
-  },
-
-  startsWith: (prefix, message) => {
-    return (value, field) => {
-      if (typeof value === 'string' && !value.startsWith(prefix)) {
-        return {
-          field,
-          message: message || `Field must start with "${prefix}"`,
-          type: 'startsWith'
-        };
-      }
-      return null;
-    };
-  },
-
-  endsWith: (suffix, message) => {
-    return (value, field) => {
-      if (typeof value === 'string' && !value.endsWith(suffix)) {
-        return {
-          field,
-          message: message || `Field must end with "${suffix}"`,
-          type: 'endsWith'
-        };
-      }
-      return null;
-    };
-  }
-};
-
-function validate(schema) {
-  return (req, res, next) => {
-    try {
-      schema.validate(req.body);
-      next();
-    } catch (error) {
-      if (error instanceof ValidationError) {
-        return res.status(400).json({
-          success: false,
-          message: 'Validation failed',
-          errors: error.errors
-        });
-      }
-      throw error;
-    }
-  };
-}
-
-function validatePartial(schema) {
-  const partial = {};
-
-  for (const field in schema.fields) {
-    const rules = schema.fields[field];
-
-    const filtered = rules.filter(v =>
-      v.name !== 'required' &&
-      v.name !== 'requiredTrue' &&
-      v.name !== 'mustBeTrue'
-    );
-    partial[field] = [validators.optional(), ...filtered];
-  }
-
-  return new Schema(partial);
-}
 
 class LiekoExpress {
   constructor() {
@@ -424,10 +29,11 @@ class LiekoExpress {
       strictTrailingSlash: true,
       allowTrailingSlash: true,
       views: path.join(process.cwd(), "views"),
-      "view engine": null
+      "view engine": "html"
     };
 
     this.engines = {};
+    this.engines['.html'] = this._defaultHtmlEngine.bind(this);
 
     this.bodyParserOptions = {
       json: {
@@ -548,6 +154,33 @@ class LiekoExpress {
 
       res.statusCode = 204;
       return res.end();
+    }
+  }
+
+  _logCorsDebug(req, opts) {
+    if (!opts.debug) return;
+
+    console.log("\n[CORS DEBUG]");
+    console.log("Request:", req.method, req.url);
+    console.log("Origin:", req.headers.origin || "none");
+
+    console.log("Applied CORS Policy:");
+    console.log("  - Access-Control-Allow-Origin:", opts.origin);
+    console.log("  - Access-Control-Allow-Methods:", opts.methods.join(", "));
+    console.log("  - Access-Control-Allow-Headers:", opts.headers.join(", "));
+
+    if (opts.credentials) {
+      console.log("  - Access-Control-Allow-Credentials: true");
+    }
+
+    if (opts.exposedHeaders?.length) {
+      console.log("  - Access-Control-Expose-Headers:", opts.exposedHeaders.join(", "));
+    }
+
+    console.log("  - Max-Age:", opts.maxAge);
+
+    if (req.method === "OPTIONS") {
+      console.log("Preflight request handled with status 204\n");
     }
   }
 
@@ -1202,7 +835,7 @@ ${cyan}    (req, res, next) => {
                   filePath = indexPath;
                   break;
                 }
-              } catch (e) {}
+              } catch (e) { }
             }
           }
 
@@ -1215,7 +848,7 @@ ${cyan}    (req, res, next) => {
                 filePath = testPath;
                 found = true;
                 break;
-              } catch (e) {}
+              } catch (e) { }
             }
             if (!found) return next();
           } else if (!stats) {
@@ -1242,7 +875,7 @@ ${cyan}    (req, res, next) => {
                   stats = indexStats;
                   break;
                 }
-              } catch (e) {}
+              } catch (e) { }
             }
 
             if (stats.isDirectory()) {
@@ -1352,6 +985,10 @@ ${cyan}    (req, res, next) => {
     }
 
     const finalHandler = handlers[handlers.length - 1];
+    if (!finalHandler) {
+      throw new Error(`Route handler is undefined for ${method} ${path}`);
+    }
+
     const routeMiddlewares = handlers.slice(0, -1);
 
     routeMiddlewares.forEach(mw => {
@@ -1363,7 +1000,7 @@ ${cyan}    (req, res, next) => {
     const paths = Array.isArray(path) ? path : [path];
 
     paths.forEach(original => {
-      let p = String(original).trim();      
+      let p = String(original).trim();
       p = p.replace(/\/+/g, '/');
 
       if (p !== '/' && p.endsWith('/')) {
@@ -1383,7 +1020,7 @@ ${cyan}    (req, res, next) => {
         path: p,
         originalPath: original,
         handler: finalHandler,
-        handlerName: finalHandler.name || 'anonymous',
+        handlerName: (finalHandler && finalHandler.name) || 'anonymous',
         middlewares: routeMiddlewares,
         pattern: this._pathToRegex(p),
         allowTrailingSlash: this.settings.allowTrailingSlash ?? false,
@@ -1447,7 +1084,6 @@ ${cyan}    (req, res, next) => {
         }
       }
     }
-
     return null;
   }
 
@@ -1780,6 +1416,16 @@ ${cyan}    (req, res, next) => {
 
     req.originalUrl = req.url;
     req.xhr = (req.headers['x-requested-with'] || '').toLowerCase() === 'xmlhttprequest';
+
+    req.get = (name) => {
+      if (typeof name !== 'string') return undefined;
+      const lower = name.toLowerCase();
+      for (const key in req.headers) {
+        if (key.toLowerCase() === lower) return req.headers[key];
+      }
+      return undefined;
+    };
+    req.header = req.get;
   }
 
   _enhanceResponse(req, res) {
@@ -1862,35 +1508,39 @@ ${cyan}    (req, res, next) => {
         if (!ext) {
           ext = this.settings['view engine'];
           if (!ext) {
-            throw new Error('No default view engine specified. Use app.set("view engine", "ejs") or provide file extension.');
+            ext = '.html';
+            viewPath = view + ext;
+          } else {
+            if (!ext.startsWith('.')) ext = '.' + ext;
+            viewPath = view + ext;
           }
-          if (!ext.startsWith('.')) ext = '.' + ext;
-          viewPath = view + ext;
         }
 
         const viewsDir = this.settings.views || path.join(process.cwd(), 'views');
         let fullPath = path.join(viewsDir, viewPath);
-
         let fileExists = false;
         try {
           await fs.promises.access(fullPath);
           fileExists = true;
         } catch (err) {
-          const htmlPath = fullPath.replace(new RegExp(ext.replace('.', '\\.') + '$'), '.html');
-          try {
-            await fs.promises.access(htmlPath);
-            fullPath = htmlPath;
-            fileExists = true;
-          } catch (err2) {
-            fileExists = false;
+          const extensions = ['.html', '.ejs', '.pug', '.hbs'];
+          for (const tryExt of extensions) {
+            if (tryExt === ext) continue;
+            const tryPath = fullPath.replace(new RegExp(ext.replace('.', '\\.') + '$'), tryExt);
+            try {
+              await fs.promises.access(tryPath);
+              fullPath = tryPath;
+              ext = tryExt;
+              fileExists = true;
+              break;
+            } catch (err2) { }
           }
         }
 
         if (!fileExists) {
           const error = new Error(
-            `View "${view}" not found. Tried:\n` +
-            `- ${fullPath}\n` +
-            `- ${fullPath.replace(new RegExp(ext.replace('.', '\\.') + '$'), '.html')}`
+            `View "${view}" not found in views directory "${viewsDir}".\n` +
+            `Tried: ${fullPath}`
           );
           error.code = 'ENOENT';
           if (callback) return callback(error);
@@ -1900,24 +1550,38 @@ ${cyan}    (req, res, next) => {
         const renderEngine = this.engines[ext];
 
         if (!renderEngine) {
-          throw new Error(`No engine registered for extension "${ext}". Use app.engine("${ext}", renderFunction)`);
+          throw new Error(
+            `No engine registered for extension "${ext}".\n` +
+            `Use app.engine("${ext}", renderFunction) to register one.`
+          );
         }
 
-        renderEngine(fullPath, locals, (err, html) => {
-          if (err) {
-            if (callback) return callback(err);
-            throw err;
-          }
+        return new Promise((resolve, reject) => {
+          renderEngine(fullPath, locals, (err, html) => {
+            if (err) {
+              if (callback) {
+                callback(err);
+                resolve();
+              } else {
+                reject(err);
+              }
+              return;
+            }
 
-          if (callback) {
-            callback(null, html);
-          } else {
-            res.statusCode = statusCode;
-            res.setHeader('Content-Type', 'text/html; charset=utf-8');
-            responseSent = true;
-            statusCode = 200;
-            res.end(html);
-          }
+            if (callback) {
+              callback(null, html);
+              resolve();
+            } else {
+              /*
+              HBS cause error header already sent here ??
+              */
+              //res.statusCode = statusCode || 200;
+              //res.setHeader('Content-Type', 'text/html; charset=utf-8');
+              //responseSent = true;
+              res.html(html);
+              resolve();
+            }
+          });
         });
 
       } catch (error) {
@@ -1929,17 +1593,15 @@ ${cyan}    (req, res, next) => {
       }
     };
 
-
     res.json = (data) => {
       if (responseSent) return res;
 
       const json = JSON.stringify(data);
       const length = Buffer.byteLength(json);
 
-      res.writeHead(statusCode, buildHeaders('application/json; charset=utf-8', length));
+      res.writeHead(statusCode || 200, buildHeaders('application/json; charset=utf-8', length));
 
       responseSent = true;
-      statusCode = 200;
       return res.end(json);
     };
 
@@ -1964,15 +1626,14 @@ ${cyan}    (req, res, next) => {
 
       const length = Buffer.byteLength(body);
 
-      res.writeHead(statusCode, buildHeaders(contentType, length));
+      res.writeHead(statusCode || 200, buildHeaders(contentType, length));
 
       responseSent = true;
-      statusCode = 200;
       return res.end(body);
     };
 
-    res.html = function (html, status = 200) {
-      res.statusCode = status;
+    res.html = function (html, status) {
+      res.statusCode = status !== undefined ? status : (statusCode || 200);
       res.setHeader('Content-Type', 'text/html; charset=utf-8');
       res.end(html);
     };
@@ -2067,6 +1728,42 @@ ${cyan}    (req, res, next) => {
     };
   }
 
+  _defaultHtmlEngine(filePath, locals, callback) {
+    fs.readFile(filePath, 'utf-8', (err, content) => {
+      if (err) return callback(err);
+
+      let rendered = content;
+
+      Object.keys(locals).forEach(key => {
+        if (locals[key] !== undefined && locals[key] !== null) {
+          const safeRegex = new RegExp(`{{\\s*${key}\\s*}}`, 'g');
+          const unsafeRegex = new RegExp(`{{{\\s*${key}\\s*}}}`, 'g');
+
+          if (safeRegex.test(rendered)) {
+            const escaped = this._escapeHtml(String(locals[key]));
+            rendered = rendered.replace(safeRegex, escaped);
+          }
+
+          if (unsafeRegex.test(rendered)) {
+            rendered = rendered.replace(unsafeRegex, String(locals[key]));
+          }
+        }
+      });
+
+      callback(null, rendered);
+    });
+  }
+
+  _escapeHtml(text) {
+    if (typeof text !== 'string') return text;
+    return text
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#039;');
+  }
+
   async _runMiddleware(handler, req, res) {
     return new Promise((resolve, reject) => {
       const next = (err) => err ? reject(err) : resolve();
@@ -2144,34 +1841,7 @@ ${cyan}    (req, res, next) => {
     logLines.push('---------------------------------------------');
     console.log('\n' + logLines.join('\n') + '\n');
   }
-
-  _logCorsDebug(req, opts) {
-    if (!opts.debug) return;
-
-    console.log("\n[CORS DEBUG]");
-    console.log("Request:", req.method, req.url);
-    console.log("Origin:", req.headers.origin || "none");
-
-    console.log("Applied CORS Policy:");
-    console.log("  - Access-Control-Allow-Origin:", opts.origin);
-    console.log("  - Access-Control-Allow-Methods:", opts.methods.join(", "));
-    console.log("  - Access-Control-Allow-Headers:", opts.headers.join(", "));
-
-    if (opts.credentials) {
-      console.log("  - Access-Control-Allow-Credentials: true");
-    }
-
-    if (opts.exposedHeaders?.length) {
-      console.log("  - Access-Control-Expose-Headers:", opts.exposedHeaders.join(", "));
-    }
-
-    console.log("  - Max-Age:", opts.maxAge);
-
-    if (req.method === "OPTIONS") {
-      console.log("Preflight request handled with status 204\n");
-    }
-  }
-
+  
   listRoutes() {
     const routeEntries = [];
 
@@ -2242,6 +1912,7 @@ ${cyan}    (req, res, next) => {
       console.log(` \x1b[36m${r.method.padEnd(7)}\x1b[0m \x1b[33m${pathStr}\x1b[0m \x1b[90m(mw: ${r.mw})\x1b[0m`);
     }
   }
+
   listen() {
     const args = Array.from(arguments);
     const server = createServer(this._handleRequest.bind(this));
@@ -2262,13 +1933,10 @@ function Router() {
 
 module.exports = Lieko;
 module.exports.Router = Router;
+
 module.exports.Schema = Schema;
-module.exports.schema = (...args) => new Schema(...args);
+module.exports.createSchema = (...args) => new Schema(...args);
 module.exports.validators = validators;
 module.exports.validate = validate;
 module.exports.validatePartial = validatePartial;
 module.exports.ValidationError = ValidationError;
-module.exports.static = function (root, options) {
-  const app = new LiekoExpress();
-  return app.static(root, options);
-};

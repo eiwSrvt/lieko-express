@@ -58,7 +58,7 @@ Running 10s test @ http://127.0.0.1:3000/ping
 
 **Summary:**  
 Req/Bytes counts sampled once per second.  
-# of samples: 11  
+of samples: 11  
 **310k requests in 11.02s, 52.4 MB read**
 
 ---
@@ -107,7 +107,7 @@ Running 10s test @ http://127.0.0.1:3001/ping
 
 **Summary:**  
 Req/Bytes counts sampled once per second.  
-# of samples: 11  
+of samples: 11  
 **207k requests in 11.02s, 47.6 MB read**
 
 ---

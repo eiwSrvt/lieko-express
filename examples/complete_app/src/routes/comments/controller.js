@@ -68,14 +68,45 @@ const approveComment = (req, res) => {
     res.ok(comment, 'Comment approved successfully');
 };
 
+const updateComment = (req, res) => {
+    const comment = db.comments.find(c => c.id === +req.params.id);
+    if (!comment) return res.error({ code: 'NOT_FOUND', message: 'Comment not found' });
+
+    if (req.body.text !== undefined) {
+        comment.text = req.body.text;
+    }
+
+    if (req.body.postId !== undefined) {
+        comment.postId = Number(req.body.postId);
+    }
+
+    comment.updatedAt = new Date().toISOString();
+
+    db.saveComments(db.comments);
+
+    res.ok(comment, 'Comment updated successfully');
+};
+
 const deleteComment = (req, res) => {
     const index = db.comments.findIndex(c => c.id === +req.params.id);
-    if (index === -1) return res.error({ code: 'NOT_FOUND', message: 'Comment not found' });
+
+    if (index === -1) {
+        return res.error({
+            code: 'NOT_FOUND',
+            message: 'Comment not found',
+            details: `Comment with ID ${req.params.id} does not exist`
+        });
+    }
+
+    const deletedComment = db.comments[index];
 
     db.comments.splice(index, 1);
     db.saveComments(db.comments);
 
-    res.ok(null, 'Comment deleted successfully');
+    res.ok(
+        { id: deletedComment.id, message: 'Comment deleted' },
+        'Comment deleted successfully'
+    );
 };
 
 module.exports = {
@@ -83,5 +114,6 @@ module.exports = {
     getComment,
     createComment,
     approveComment,
+    updateComment,
     deleteComment
 };

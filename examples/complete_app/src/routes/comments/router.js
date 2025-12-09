@@ -5,7 +5,8 @@ const {
   getComment,
   createComment,
   approveComment,
-  updateComment
+  updateComment,
+  deleteComment
 } = require('./controller');
 
 const { createCommentSchema, updateCommentSchema } = require('./schema');
@@ -19,5 +20,7 @@ router.post('/', validate(createCommentSchema), createComment);
 
 router.patch('/:id', validate(updateCommentSchema), updateComment);
 router.patch('/:id/approve', approveComment);
+
+router.delete('/:id', deleteComment);
 
 module.exports = router;

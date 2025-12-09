@@ -1,23 +1,24 @@
-const Lieko = require('lieko-express');
+const path = require('path');
+const app = require('lieko-express')();
 const config = require('./config');
 const logger = require('./middleware/logger');
 const { notFoundHandler, errorHandler } = require('./middleware/errorHandler');
 const mountRoutes = require('./routes');
 
-const app = Lieko();
+app.set('views', path.join(__dirname, './views'))
 
 app.enable('debug');
 //app.enable('trust proxy');
 app.enable('allowTrailingSlash');
 app.disable('x-powered-by');
 
-// Only for overide default settings json: 1mb, url: 1mb
+// Only for overide default settings json: 10mb, url: 10mb
 //app.json({ limit: '50mb' });
 //app.urlencoded({ limit: '100kb', extended: false });
 //app.multipart({ limit: '50mb' })
 
 app.use(logger);
-app.cors({ debug: true });
+app.cors({ debug: false });
 
 mountRoutes(app);
 
@@ -25,7 +26,6 @@ app.notFound(notFoundHandler);
 app.errorHandler(errorHandler);
 
 app.printRoutes();
-//app.printRoutesNested();
 
 const server = app.listen(config.port, () => {
   console.log(`
