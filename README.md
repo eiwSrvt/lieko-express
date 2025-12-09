@@ -1,6 +1,6 @@
-# **Lieko-express — A Modern, Minimal, REST API Framework for Node.js**
+# **Lieko-express — A Modern, Minimal, express-like Framework for Node.js**
 
-A lightweight, fast, and modern Node.js REST API framework built on top of the native `http` module. Zero external dependencies for core functionality.
+A lightweight, fast, and modern Node.js framework built on top of the native `http` module. Zero external dependencies for core functionality.
 
 ![Performance](https://img.shields.io/badge/Performance-49%25_faster_than_Express-00d26a?style=for-the-badge)
 
@@ -388,7 +388,7 @@ app.use(async (req, res, next) => {
 Lieko-Express includes a **fully built-in, high-performance CORS engine**, with:
 
 * Global CORS (`app.cors()`)
-* Route-level CORS (`app.get("/test", { cors: {...} }, handler)`—coming soon if you want it)
+* Route-level CORS (`app.get("/test", { cors: {...} }, handler)`)
 * Wildcard origins (`https://*.example.com`)
 * Multiple allowed origins
 * Strict mode (reject unknown origins)
@@ -906,8 +906,6 @@ const app = Lieko();   // Ready to handle JSON, form-data, files, etc.
 | `application/json`                   | **1mb**       | ~1,048,576 bytes  |
 | `application/x-www-form-urlencoded`   | **1mb**       | ~1,048,576 bytes  |
 | `multipart/form-data` (file uploads)  | **10mb**      | ~10,485,760 bytes |
-
-That’s already **10× more generous** than Express’s default 100kb!
 
 ### Change Limits — Three Super-Simple Ways
 

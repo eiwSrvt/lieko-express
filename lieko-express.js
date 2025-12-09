@@ -64,124 +64,20 @@ class LiekoExpress {
   }
 
   cors(options = {}) {
-    this.corsOptions = {
-      ...this.corsOptions,
-      enabled: true,
-      ...options
-    };
-  }
-
-  _matchOrigin(origin, allowedOrigin) {
-    if (!origin || !allowedOrigin) return false;
-
-    if (Array.isArray(allowedOrigin)) {
-      return allowedOrigin.some(o => this._matchOrigin(origin, o));
+    if (options === false) {
+      this._corsMiddleware = null;
+      return this;
     }
 
-    if (allowedOrigin === "*") return true;
+    const middleware = require('./lib/cors')(options);
+    this._corsMiddleware = middleware;
 
-    // Wildcard https://*.example.com
-    if (allowedOrigin.includes("*")) {
-      const regex = new RegExp("^" + allowedOrigin
-        .replace(/\./g, "\\.")
-        .replace(/\*/g, ".*") + "$");
-
-      return regex.test(origin);
+    const stack = new Error().stack;
+    if (!stack.includes('at LiekoExpress.use')) {
+      this.use(middleware);
     }
 
-    return origin === allowedOrigin;
-  }
-
-  _applyCors(req, res, opts) {
-    if (!opts || !opts.enabled) return;
-
-    const requestOrigin = req.headers.origin || "";
-
-    let finalOrigin = "*";
-
-    if (opts.strictOrigin && requestOrigin) {
-      const allowed = this._matchOrigin(requestOrigin, opts.origin);
-
-      if (!allowed) {
-        res.statusCode = 403;
-        return res.end(JSON.stringify({
-          success: false,
-          error: "Origin Forbidden",
-          message: `Origin "${requestOrigin}" is not allowed`
-        }));
-      }
-    }
-
-    if (opts.origin === "*") {
-      finalOrigin = "*";
-    } else if (Array.isArray(opts.origin)) {
-      const match = opts.origin.find(o => this._matchOrigin(requestOrigin, o));
-      finalOrigin = match || opts.origin[0];
-    } else {
-      finalOrigin = this._matchOrigin(requestOrigin, opts.origin)
-        ? requestOrigin
-        : opts.origin;
-    }
-
-    this._logCorsDebug(req, {
-      ...opts,
-      origin: finalOrigin
-    });
-
-    res.setHeader("Access-Control-Allow-Origin", finalOrigin);
-
-    if (opts.credentials) {
-      res.setHeader("Access-Control-Allow-Credentials", "true");
-    }
-
-    if (opts.exposedHeaders?.length) {
-      res.setHeader("Access-Control-Expose-Headers",
-        opts.exposedHeaders.join(", "));
-    }
-
-    // Chrome Private Network Access
-    if (
-      opts.allowPrivateNetwork &&
-      req.headers["access-control-request-private-network"] === "true"
-    ) {
-      res.setHeader("Access-Control-Allow-Private-Network", "true");
-    }
-
-    if (req.method === "OPTIONS") {
-      res.setHeader("Access-Control-Allow-Methods", opts.methods.join(", "));
-      res.setHeader("Access-Control-Allow-Headers", opts.headers.join(", "));
-      res.setHeader("Access-Control-Max-Age", opts.maxAge);
-
-      res.statusCode = 204;
-      return res.end();
-    }
-  }
-
-  _logCorsDebug(req, opts) {
-    if (!opts.debug) return;
-
-    console.log("\n[CORS DEBUG]");
-    console.log("Request:", req.method, req.url);
-    console.log("Origin:", req.headers.origin || "none");
-
-    console.log("Applied CORS Policy:");
-    console.log("  - Access-Control-Allow-Origin:", opts.origin);
-    console.log("  - Access-Control-Allow-Methods:", opts.methods.join(", "));
-    console.log("  - Access-Control-Allow-Headers:", opts.headers.join(", "));
-
-    if (opts.credentials) {
-      console.log("  - Access-Control-Allow-Credentials: true");
-    }
-
-    if (opts.exposedHeaders?.length) {
-      console.log("  - Access-Control-Expose-Headers:", opts.exposedHeaders.join(", "));
-    }
-
-    console.log("  - Max-Age:", opts.maxAge);
-
-    if (req.method === "OPTIONS") {
-      console.log("Preflight request handled with status 204\n");
-    }
+    return middleware;
   }
 
   debug(value = true) {
@@ -708,248 +604,7 @@ ${cyan}    (req, res, next) => {
   }
 
   static(root, options = {}) {
-    const opts = {
-      maxAge: options.maxAge || 0,
-      index: options.index !== undefined ? options.index : 'index.html',
-      dotfiles: options.dotfiles || 'ignore',
-      etag: options.etag !== undefined ? options.etag : true,
-      extensions: options.extensions || false,
-      fallthrough: options.fallthrough !== undefined ? options.fallthrough : true,
-      immutable: options.immutable || false,
-      lastModified: options.lastModified !== undefined ? options.lastModified : true,
-      redirect: options.redirect !== undefined ? options.redirect : true,
-      setHeaders: options.setHeaders || null,
-      cacheControl: options.cacheControl !== undefined ? options.cacheControl : true
-    };
-
-    const mimeTypes = {
-      '.html': 'text/html; charset=utf-8',
-      '.htm': 'text/html; charset=utf-8',
-      '.css': 'text/css; charset=utf-8',
-      '.js': 'application/javascript; charset=utf-8',
-      '.mjs': 'application/javascript; charset=utf-8',
-      '.json': 'application/json; charset=utf-8',
-      '.xml': 'application/xml; charset=utf-8',
-      '.txt': 'text/plain; charset=utf-8',
-      '.md': 'text/markdown; charset=utf-8',
-      '.jpg': 'image/jpeg',
-      '.jpeg': 'image/jpeg',
-      '.png': 'image/png',
-      '.gif': 'image/gif',
-      '.svg': 'image/svg+xml',
-      '.webp': 'image/webp',
-      '.ico': 'image/x-icon',
-      '.bmp': 'image/bmp',
-      '.tiff': 'image/tiff',
-      '.tif': 'image/tiff',
-      '.mp3': 'audio/mpeg',
-      '.wav': 'audio/wav',
-      '.ogg': 'audio/ogg',
-      '.m4a': 'audio/mp4',
-      '.aac': 'audio/aac',
-      '.flac': 'audio/flac',
-      '.mp4': 'video/mp4',
-      '.webm': 'video/webm',
-      '.ogv': 'video/ogg',
-      '.avi': 'video/x-msvideo',
-      '.mov': 'video/quicktime',
-      '.wmv': 'video/x-ms-wmv',
-      '.flv': 'video/x-flv',
-      '.mkv': 'video/x-matroska',
-      '.woff': 'font/woff',
-      '.woff2': 'font/woff2',
-      '.ttf': 'font/ttf',
-      '.otf': 'font/otf',
-      '.eot': 'application/vnd.ms-fontobject',
-      '.zip': 'application/zip',
-      '.rar': 'application/x-rar-compressed',
-      '.tar': 'application/x-tar',
-      '.gz': 'application/gzip',
-      '.7z': 'application/x-7z-compressed',
-      '.pdf': 'application/pdf',
-      '.doc': 'application/msword',
-      '.docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-      '.xls': 'application/vnd.ms-excel',
-      '.xlsx': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-      '.ppt': 'application/vnd.ms-powerpoint',
-      '.pptx': 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
-      '.wasm': 'application/wasm',
-      '.csv': 'text/csv; charset=utf-8'
-    };
-
-    const getMimeType = (filePath) => {
-      const ext = path.extname(filePath).toLowerCase();
-      return mimeTypes[ext] || 'application/octet-stream';
-    };
-
-    const generateETag = (stats) => {
-      const mtime = stats.mtime.getTime().toString(16);
-      const size = stats.size.toString(16);
-      return `W/"${size}-${mtime}"`;
-    };
-
-    return async (req, res, next) => {
-      if (req.method !== 'GET' && req.method !== 'HEAD') {
-        return next();
-      }
-
-      try {
-        let pathname = req.url;
-        const qIndex = pathname.indexOf('?');
-        if (qIndex !== -1) {
-          pathname = pathname.substring(0, qIndex);
-        }
-
-        if (pathname === '') {
-          pathname = '/';
-        }
-
-        try {
-          pathname = decodeURIComponent(pathname);
-        } catch (e) {
-          if (opts.fallthrough) return next();
-          return res.status(400).send('Bad Request');
-        }
-
-        let filePath = pathname === '/' ? root : path.join(root, pathname);
-
-        const resolvedPath = path.resolve(filePath);
-        const resolvedRoot = path.resolve(root);
-
-        if (!resolvedPath.startsWith(resolvedRoot)) {
-          if (opts.fallthrough) return next();
-          return res.status(403).send('Forbidden');
-        }
-
-        let stats;
-        try {
-          stats = await fs.promises.stat(filePath);
-        } catch (err) {
-          if (pathname === '/' && opts.index) {
-            const indexes = Array.isArray(opts.index) ? opts.index : [opts.index];
-            for (const indexFile of indexes) {
-              const indexPath = path.join(root, indexFile);
-              try {
-                stats = await fs.promises.stat(indexPath);
-                if (stats.isFile()) {
-                  filePath = indexPath;
-                  break;
-                }
-              } catch (e) { }
-            }
-          }
-
-          if (!stats && opts.extensions && Array.isArray(opts.extensions)) {
-            let found = false;
-            for (const ext of opts.extensions) {
-              const testPath = filePath + (ext.startsWith('.') ? ext : '.' + ext);
-              try {
-                stats = await fs.promises.stat(testPath);
-                filePath = testPath;
-                found = true;
-                break;
-              } catch (e) { }
-            }
-            if (!found) return next();
-          } else if (!stats) {
-            return next();
-          }
-        }
-
-        if (stats.isDirectory()) {
-          if (opts.redirect && !pathname.endsWith('/')) {
-            const query = qIndex !== -1 ? req.url.substring(qIndex) : '';
-            const redirectUrl = pathname + '/' + query;
-            return res.redirect(redirectUrl, 301);
-          }
-
-          if (opts.index) {
-            const indexes = Array.isArray(opts.index) ? opts.index : [opts.index];
-
-            for (const indexFile of indexes) {
-              const indexPath = path.join(filePath, indexFile);
-              try {
-                const indexStats = await fs.promises.stat(indexPath);
-                if (indexStats.isFile()) {
-                  filePath = indexPath;
-                  stats = indexStats;
-                  break;
-                }
-              } catch (e) { }
-            }
-
-            if (stats.isDirectory()) {
-              if (opts.fallthrough) return next();
-              return res.status(404).send('Not Found');
-            }
-          } else {
-            if (opts.fallthrough) return next();
-            return res.status(404).send('Not Found');
-          }
-        }
-
-        if (opts.etag) {
-          const etag = generateETag(stats);
-          const ifNoneMatch = req.headers['if-none-match'];
-
-          if (ifNoneMatch === etag) {
-            res.statusCode = 304;
-            res.end();
-            return;
-          }
-
-          res.setHeader('ETag', etag);
-        }
-
-        if (opts.lastModified) {
-          const lastModified = stats.mtime.toUTCString();
-          const ifModifiedSince = req.headers['if-modified-since'];
-
-          if (ifModifiedSince === lastModified) {
-            res.statusCode = 304;
-            res.end();
-            return;
-          }
-
-          res.setHeader('Last-Modified', lastModified);
-        }
-
-        if (opts.cacheControl) {
-          let cacheControl = 'public';
-
-          if (opts.maxAge > 0) {
-            cacheControl += `, max-age=${opts.maxAge}`;
-          }
-
-          if (opts.immutable) {
-            cacheControl += ', immutable';
-          }
-
-          res.setHeader('Cache-Control', cacheControl);
-        }
-
-        const mimeType = getMimeType(filePath);
-        res.setHeader('Content-Type', mimeType);
-        res.setHeader('Content-Length', stats.size);
-
-        if (typeof opts.setHeaders === 'function') {
-          opts.setHeaders(res, filePath, stats);
-        }
-
-        if (req.method === 'HEAD') {
-          return res.end();
-        }
-
-        const data = await fs.promises.readFile(filePath);
-        res.end(data);
-        return;
-
-      } catch (error) {
-        console.error('Static middleware error:', error);
-        if (opts.fallthrough) return next();
-        res.status(500).send('Internal Server Error');
-      }
-    };
+    return require('./lib/static')(root, options);
   }
 
   _mountRouter(basePath, router) {
@@ -1426,6 +1081,90 @@ ${cyan}    (req, res, next) => {
       return undefined;
     };
     req.header = req.get;
+
+    const parseAccept = (header) => {
+      if (!header) return [];
+      return header
+        .split(',')
+        .map(part => {
+          const [type, ...rest] = part.trim().split(';');
+          const q = rest
+            .find(p => p.trim().startsWith('q='))
+            ?.split('=')[1];
+          const quality = q ? parseFloat(q) : 1.0;
+          return { type: type.trim().toLowerCase(), quality };
+        })
+        .filter(item => item.quality > 0)
+        .sort((a, b) => b.quality - a.quality)
+        .map(item => item.type);
+    };
+
+    const accepts = (types) => {
+      if (!Array.isArray(types)) types = [types];
+      const accepted = parseAccept(req.headers['accept']);
+
+      for (const type of types) {
+        const t = type.toLowerCase();
+
+        if (accepted.includes(t)) return type;
+
+        if (accepted.some(a => {
+          if (a === '*/*') return true;
+          if (a.endsWith('/*')) {
+            const prefix = a.slice(0, -1);
+            return t.startsWith(prefix);
+          }
+          return false;
+        })) {
+          return type;
+        }
+      }
+
+      return false;
+    };
+
+    req.accepts = function (types) {
+      return accepts(types);
+    };
+
+    req.acceptsLanguages = function (langs) {
+      if (!Array.isArray(langs)) langs = [langs];
+      const accepted = parseAccept(req.headers['accept-language'] || '');
+      for (const lang of langs) {
+        const l = lang.toLowerCase();
+        if (accepted.some(a => a === l || a.startsWith(l + '-'))) return lang;
+      }
+      return false;
+    };
+
+    req.acceptsEncodings = function (encodings) {
+      if (!Array.isArray(encodings)) encodings = [encodings];
+      const accepted = parseAccept(req.headers['accept-encoding'] || '');
+      for (const enc of encodings) {
+        if (accepted.includes(enc.toLowerCase())) return enc;
+      }
+      return false;
+    };
+
+    req.acceptsCharsets = function (charsets) {
+      if (!Array.isArray(charsets)) charsets = [charsets];
+      const accepted = parseAccept(req.headers['accept-charset'] || '');
+      for (const charset of charsets) {
+        if (accepted.includes(charset.toLowerCase())) return charset;
+      }
+      return false;
+    };
+
+    req.is = function (type) {
+      const ct = (req.headers['content-type'] || '').split(';')[0].trim().toLowerCase();
+      if (!type) return ct;
+      const t = type.toLowerCase();
+      if (t.includes('/')) return ct === t;
+      if (t === 'json') return ct.includes('json');
+      if (t === 'urlencoded') return ct.includes('x-www-form-urlencoded');
+      if (t === 'multipart') return ct.includes('multipart');
+      return false;
+    };
   }
 
   _enhanceResponse(req, res) {
@@ -1504,6 +1243,7 @@ ${cyan}    (req, res, next) => {
         const locals = { ...res.locals, ...options };
         let viewPath = view;
         let ext = path.extname(view);
+        console.log("EXT: ", ext)
 
         if (!ext) {
           ext = this.settings['view engine'];
@@ -1518,11 +1258,13 @@ ${cyan}    (req, res, next) => {
 
         const viewsDir = this.settings.views || path.join(process.cwd(), 'views');
         let fullPath = path.join(viewsDir, viewPath);
+        console.log(fullPath)
         let fileExists = false;
         try {
           await fs.promises.access(fullPath);
           fileExists = true;
         } catch (err) {
+          console.log(err)
           const extensions = ['.html', '.ejs', '.pug', '.hbs'];
           for (const tryExt of extensions) {
             if (tryExt === ext) continue;
@@ -1841,7 +1583,7 @@ ${cyan}    (req, res, next) => {
     logLines.push('---------------------------------------------');
     console.log('\n' + logLines.join('\n') + '\n');
   }
-  
+
   listRoutes() {
     const routeEntries = [];
 
@@ -1916,7 +1658,6 @@ ${cyan}    (req, res, next) => {
   listen() {
     const args = Array.from(arguments);
     const server = createServer(this._handleRequest.bind(this));
-
     server.listen.apply(server, args);
     this.server = server;
     return server;
