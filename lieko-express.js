@@ -78,7 +78,7 @@ class LiekoExpress {
       }
 
       let regexStr = pattern
-        .replace(/[.*+?^${}()|[\]\\]/g, '\\$&') 
+        .replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
         .replace(/\\\*/g, '.*');
 
       regexStr = '^' + regexStr + '$';
@@ -912,7 +912,8 @@ ${cyan}    (req, res, next) => {
 
   async _handleRequest(req, res) {
     if (this._isExcluded(req.url.split('?')[0])) {
-      return res.status(404).end();
+      res.statusCode = 404;
+      return res.end();
     }
 
     this._enhanceRequest(req);
