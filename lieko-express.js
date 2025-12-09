@@ -61,6 +61,36 @@ class LiekoExpress {
       exposedHeaders: [],
       debug: false
     };
+
+    this.excludedPatterns = [
+      /^\/\.well-known\/.*/i // Chrome DevTools, Apple, etc.
+    ]
+  }
+
+  excludeUrl(patterns) {
+    if (!Array.isArray(patterns)) patterns = [patterns];
+    this.excludedPatterns = this.excludedPatterns || [];
+
+    patterns.forEach(pattern => {
+      if (pattern instanceof RegExp) {
+        this.excludedPatterns.push(pattern);
+        return;
+      }
+
+      let regexStr = pattern
+        .replace(/[.*+?^${}()|[\]\\]/g, '\\$&') 
+        .replace(/\\\*/g, '.*');
+
+      regexStr = '^' + regexStr + '$';
+      this.excludedPatterns.push(new RegExp(regexStr, 'i'));
+    });
+
+    return this;
+  }
+
+  _isExcluded(url) {
+    if (!this.excludedPatterns?.length) return false;
+    return this.excludedPatterns.some(re => re.test(url));
   }
 
   cors(options = {}) {
@@ -881,6 +911,10 @@ ${cyan}    (req, res, next) => {
   }
 
   async _handleRequest(req, res) {
+    if (this._isExcluded(req.url.split('?')[0])) {
+      return res.status(404).end();
+    }
+
     this._enhanceRequest(req);
 
     const url = req.url;
@@ -1243,7 +1277,6 @@ ${cyan}    (req, res, next) => {
         const locals = { ...res.locals, ...options };
         let viewPath = view;
         let ext = path.extname(view);
-        console.log("EXT: ", ext)
 
         if (!ext) {
           ext = this.settings['view engine'];
@@ -1258,13 +1291,11 @@ ${cyan}    (req, res, next) => {
 
         const viewsDir = this.settings.views || path.join(process.cwd(), 'views');
         let fullPath = path.join(viewsDir, viewPath);
-        console.log(fullPath)
         let fileExists = false;
         try {
           await fs.promises.access(fullPath);
           fileExists = true;
         } catch (err) {
-          console.log(err)
           const extensions = ['.html', '.ejs', '.pug', '.hbs'];
           for (const tryExt of extensions) {
             if (tryExt === ext) continue;
@@ -1314,12 +1345,6 @@ ${cyan}    (req, res, next) => {
               callback(null, html);
               resolve();
             } else {
-              /*
-              HBS cause error header already sent here ??
-              */
-              //res.statusCode = statusCode || 200;
-              //res.setHeader('Content-Type', 'text/html; charset=utf-8');
-              //responseSent = true;
               res.html(html);
               resolve();
             }
