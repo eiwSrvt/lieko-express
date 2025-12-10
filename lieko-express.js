@@ -1200,6 +1200,26 @@ ${cyan}    (req, res, next) => {
       if (t === 'multipart') return ct.includes('multipart');
       return false;
     };
+
+    /**
+     * Passport-compatible logout (Passport 0.6+ / 0.7)
+     * This ensures logout(cb) always calls cb(null) and never overwrites Express res
+     */
+    req.logout = function logout(callback) {
+      req.user = null;
+
+      // Remove passport session field if it exists
+      if (req.session && req.session.passport) {
+        delete req.session.passport;
+      }
+
+      // Passport v0.6+ expects async logout
+      if (typeof callback === "function") {
+        return callback(null);
+      }
+
+      return Promise.resolve();
+    };
   }
 
   _enhanceResponse(req, res) {
@@ -1476,6 +1496,54 @@ ${cyan}    (req, res, next) => {
 
     res.serverError = function (msg = "SERVER_ERROR") {
       return res.status(500).error(msg);
+    };
+
+    res.cookie = (name, value, options = {}) => {
+      const opts = {
+        path: '/',
+        httpOnly: true,
+        secure: req.secure || false,
+        sameSite: 'lax',
+        maxAge: null,
+        expires: null,
+        ...options
+      };
+
+      let cookie = `${name}=${encodeURIComponent(value)}`;
+
+      if (opts.maxAge) cookie += `; Max-Age=${Math.floor(opts.maxAge / 1000)}`;
+      if (opts.expires) cookie += `; Expires=${opts.expires.toUTCString()}`;
+      cookie += `; Path=${opts.path}`;
+      if (opts.domain) cookie += `; Domain=${opts.domain}`;
+      if (opts.httpOnly) cookie += '; HttpOnly';
+      if (opts.secure) cookie += '; Secure';
+      if (opts.sameSite) cookie += `; SameSite=${opts.sameSite}`;
+
+      res.setHeader('Set-Cookie', cookie);
+      return res;
+    };
+
+    res.clearCookie = (name, options = {}) => {
+      if (responseSent) return res;
+
+      const opts = {
+        path: '/',
+        httpOnly: true,
+        secure: req.secure || false,
+        sameSite: 'lax',
+        ...options
+      };
+
+      const cookieValue = `${name}=; Max-Age=0; Expires=${new Date(0).toUTCString()}; Path=${opts.path}`;
+
+      let header = cookieValue;
+
+      if (opts.httpOnly) header += '; HttpOnly';
+      if (opts.secure) header += '; Secure';
+      if (opts.sameSite && opts.sameSite !== 'none') header += `; SameSite=${opts.sameSite}`;
+
+      res.setHeader('Set-Cookie', header);
+      return res;
     };
 
     const originalEnd = res.end.bind(res);
