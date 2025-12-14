@@ -1105,6 +1105,7 @@ ${cyan}    (req, res, next) => {
     }
 
     req.originalUrl = req.url;
+    req.path = req.url.split('?')[0];
     req.xhr = (req.headers['x-requested-with'] || '').toLowerCase() === 'xmlhttprequest';
 
     req.get = (name) => {
