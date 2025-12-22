@@ -1,6 +1,6 @@
 {
   "name": "lieko-express",
-  "version": "0.0.14",
+  "version": "0.0.16",
   "repository": {
     "type": "git",
     "url": "https://github.com/eiwSrvt/lieko-express"
@@ -19,6 +19,7 @@
     "lieko-express.js",
     "lieko-express.d.ts",
     "README.md",
+    "helpers",
     "lib"
   ]
 }

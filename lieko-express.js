@@ -1204,6 +1204,11 @@ ${cyan}    (req, res, next) => {
       return false;
     };
 
+    req.bearer = req.headers.authorization
+      ?.startsWith('Bearer ')
+      ? req.headers.authorization.slice(7).trim()
+      : null;
+
     /**
      * Passport-compatible logout (Passport 0.6+ / 0.7)
      * This ensures logout(cb) always calls cb(null) and never overwrites Express res
