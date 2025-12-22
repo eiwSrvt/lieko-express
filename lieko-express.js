@@ -3,6 +3,8 @@ const net = require("net");
 const fs = require("fs");
 const path = require("path");
 
+const { getMimeType } = require('./helpers/mimes');
+
 const {
   Schema,
   ValidationError,
@@ -1029,7 +1031,7 @@ ${cyan}    (req, res, next) => {
 
       if (!route) {
         if (this.notFoundHandler) return this.notFoundHandler(req, res);
-        return res.status(404).json({ error: 'Route not found' });
+        return res.status(404).json({ success: false, error: { message: 'Route not found', code: 404 } });
       }
 
       req.params = route.params;
@@ -1245,9 +1247,7 @@ ${cyan}    (req, res, next) => {
 
     const buildHeaders = (contentType, length) => {
       const poweredBy = this.settings['x-powered-by'];
-      const poweredByHeader = poweredBy
-        ? { 'X-Powered-By': poweredBy === true ? 'lieko-express' : poweredBy }
-        : {};
+      const shouldShowPoweredBy = poweredBy !== false;
 
       return {
         'Content-Type': contentType,
@@ -1255,7 +1255,11 @@ ${cyan}    (req, res, next) => {
         'Date': getDateHeader(),
         'Connection': 'keep-alive',
         'Cache-Control': 'no-store',
-        ...poweredByHeader
+        ...(shouldShowPoweredBy && {
+          'X-Powered-By': poweredBy === true || poweredBy === undefined
+            ? 'lieko-express'
+            : poweredBy
+        })
       };
     };
 
@@ -1421,6 +1425,137 @@ ${cyan}    (req, res, next) => {
       return res.end(body);
     };
 
+    res.sendFile = async function (filePath, options = {}, callback) {
+      if (responseSent) {
+        if (callback) callback(new Error('Response already sent'));
+        return res;
+      }
+
+      const opts = {
+        maxAge: 0,
+        lastModified: true,
+        headers: {},
+        dotfiles: 'ignore', // 'allow', 'deny', 'ignore'
+        acceptRanges: true,
+        root: null,
+        ...options
+      };
+
+      let file = filePath;
+      if (opts.root) {
+        file = path.join(opts.root, filePath);
+      } else if (!path.isAbsolute(file)) {
+        file = path.resolve(process.cwd(), file);
+      }
+
+      const base = opts.root || process.cwd();
+      if (!file.startsWith(base + path.sep) && !file.startsWith(base)) {
+        const err = new Error('Forbidden path');
+        err.code = 'FORBIDDEN';
+        return handleError(err, 403, 'Forbidden');
+      }
+
+      const basename = path.basename(file);
+      if (opts.dotfiles === 'ignore' && basename.startsWith('.')) {
+        const err = new Error('File not found');
+        err.code = 'ENOENT';
+        return handleError(err, 404, 'Not Found');
+      }
+      if (opts.dotfiles === 'deny' && basename.startsWith('.')) {
+        const err = new Error('Forbidden');
+        err.code = 'FORBIDDEN';
+        return handleError(err, 403, 'Forbidden');
+      }
+
+      try {
+        const stat = await fs.promises.stat(file);
+        if (!stat.isFile()) {
+          const err = new Error('Not a file');
+          err.code = 'ENOENT';
+          return handleError(err, 404, 'Not Found');
+        }
+
+        const contentType = getMimeType(file);
+        const fileSize = stat.size;
+
+        let start = 0;
+        let end = fileSize - 1;
+        const range = req.headers.range;
+
+        if (range) {
+          const parts = range.replace(/bytes=/, '').split('-');
+          start = parseInt(parts[0], 10) || 0;
+          end = parts[1] ? parseInt(parts[1], 10) : fileSize - 1;
+
+          if (start >= fileSize || end < start || isNaN(start)) {
+            res.status(416);
+            res.setHeader('Content-Range', `bytes */${fileSize}`);
+            return handleError(new Error('Range Not Satisfiable'), 416, 'Range Not Satisfiable');
+          }
+          end = Math.min(end, fileSize - 1);
+          const chunkSize = end - start + 1;
+
+          res.status(206);
+          res.setHeader('Content-Range', `bytes ${start}-${end}/${fileSize}`);
+          res.setHeader('Content-Length', chunkSize);
+        } else {
+          res.setHeader('Content-Length', fileSize);
+        }
+
+        res.setHeader('Content-Type', contentType);
+        res.setHeader('Accept-Ranges', 'bytes');
+        if (opts.lastModified) res.setHeader('Last-Modified', stat.mtime.toUTCString());
+        if (opts.maxAge) res.setHeader('Cache-Control', `public, max-age=${opts.maxAge}`);
+        Object.entries(opts.headers).forEach(([k, v]) => res.setHeader(k, v));
+
+
+        const stream = fs.createReadStream(file, { start, end });
+        stream.on('error', err => {
+          if (!responseSent) handleError(err, 500, 'Error reading file');
+        });
+        stream.on('end', () => {
+          responseSent = true;
+          if (callback) callback(null);
+        });
+        stream.pipe(res);
+
+      } catch (err) {
+        handleError(err, err.code === 'ENOENT' ? 404 : 500);
+      }
+
+      function handleError(err, status = 500, defaultMessage = 'Server Error') {
+        responseSent = true;
+        let message = defaultMessage;
+        let details = '';
+
+        if (err.code === 'ENOENT') {
+          status = 404;
+          message = 'File Not Found';
+          details = `The file "${filePath}" does not exist.\nFull path tried: ${file}`;
+        } else if (err.code === 'FORBIDDEN') {
+          status = 403;
+          message = 'Forbidden';
+          details = `Access denied to the file "${filePath}".`;
+        } else if (err.code === 'EACCES') {
+          status = 403;
+          message = 'Permission Denied';
+          details = `No read permissions on "${filePath}".`;
+        }
+
+        if (err.stack) {
+          details += `\n\nError: ${err.message}\nStack:\n${err.stack}`;
+        }
+
+        res.status(status);
+        res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+        res.end(`${message}\n${details.trim()}`);
+
+        if (callback) callback(err);
+      }
+
+      return res;
+    };
+
     res.html = function (html, status) {
       res.statusCode = status !== undefined ? status : (statusCode || 200);
       res.setHeader('Content-Type', 'text/html; charset=utf-8');
@@ -1532,18 +1667,26 @@ ${cyan}    (req, res, next) => {
         httpOnly: true,
         secure: req.secure || false,
         sameSite: 'lax',
-        ...options
+        ...options,
+        expires: new Date(1),
+        maxAge: 0
       };
 
-      const cookieValue = `${name}=; Max-Age=0; Expires=${new Date(0).toUTCString()}; Path=${opts.path}`;
+      let cookieString = `${name}=; Path=${opts.path}; Expires=${opts.expires.toUTCString()}; Max-Age=0`;
 
-      let header = cookieValue;
+      if (opts.httpOnly) cookieString += '; HttpOnly';
+      if (opts.secure) cookieString += '; Secure';
+      if (opts.sameSite) cookieString += `; SameSite=${opts.sameSite}`;
+      if (opts.domain) cookieString += `; Domain=${opts.domain}`;
 
-      if (opts.httpOnly) header += '; HttpOnly';
-      if (opts.secure) header += '; Secure';
-      if (opts.sameSite && opts.sameSite !== 'none') header += `; SameSite=${opts.sameSite}`;
+      let existingHeaders = res.getHeader('Set-Cookie') || [];
+      if (!Array.isArray(existingHeaders)) {
+        existingHeaders = [existingHeaders];
+      }
 
-      res.setHeader('Set-Cookie', header);
+      existingHeaders.push(cookieString);
+      res.setHeader('Set-Cookie', existingHeaders);
+
       return res;
     };
 
